@@ -38,4 +38,115 @@
 
 ## Запуск
 
-Стек ещё не выбран. Инструкция появится вместе с первым рабочим сервисом.
+Реализована задача 1: инфраструктура backend. Бизнес-модели, авторизация,
+worker, внешние моки и скоринг пока не реализованы.
+
+### Стек и компоненты
+
+- `backend`: Python 3.12, FastAPI, Uvicorn, async SQLAlchemy 2 и asyncpg.
+- `db`: PostgreSQL 16, данные в именованном Docker volume `postgres_data`.
+- Зависимости backend управляются через uv, точные версии зафиксированы в
+  [`backend/uv.lock`](backend/uv.lock). Docker устанавливает их с `--locked`.
+
+Backend создаёт async engine и фабрику сессий на время жизни приложения и
+освобождает пул при завершении. Таблицы пока не создаются. При обычном запуске
+Compose ждёт healthcheck PostgreSQL перед запуском backend; уже работающий
+backend продолжает отвечать на liveness при отказе БД.
+
+### Docker
+
+Нужны Docker Engine с BuildKit и Docker Compose v2.
+Из корня репозитория:
+
+```bash
+cp .env.example .env
+docker compose up --build --wait
+```
+
+Повторный запуск после настройки `.env` — одной командой `docker compose up --build --wait`.
+Swagger UI: <http://localhost:8000/docs>, схема OpenAPI: <http://localhost:8000/openapi.json>.
+Сервисы доступны только на loopback; для публичного развёртывания нужна отдельная настройка.
+
+```bash
+docker compose down     # остановить, сохранить данные
+```
+
+`docker compose down --volumes` также удаляет данные PostgreSQL.
+
+### Окружение
+
+Скопируйте [`.env.example`](.env.example) и задайте пароль. Значение в примере
+предназначено только для локальной разработки. `.env` не коммитится и не попадает в образ.
+Настройки проверяются при старте backend; отсутствие пароля или неверные значения
+приводят к ошибке конфигурации.
+
+| Переменная | Назначение | Значение в примере |
+| --- | --- | --- |
+| `POSTGRES_DB` | Имя БД | `alfa_hack` |
+| `POSTGRES_USER` | Пользователь БД | `alfa_hack` |
+| `POSTGRES_PASSWORD` | Обязательный пароль БД | Локальный пример в `.env.example` |
+| `POSTGRES_HOST` | Адрес БД при запуске вне Docker | `localhost` |
+| `POSTGRES_PORT` | Порт БД на хосте | `5432` |
+| `DB_READINESS_TIMEOUT` | Таймаут операции проверки БД, секунды (0.1–10) | `2` |
+| `BACKEND_PORT` | HTTP-порт backend на хосте | `8000` |
+
+Внутри Compose backend всегда подключается к `db:5432`, независимо от порта на хосте.
+Пароль передаётся в SQLAlchemy URL отдельным полем, поэтому спецсимволы не требуют
+ручного URL-кодирования. Изменение реквизитов в `.env` не меняет пользователя и пароль
+в уже созданном volume PostgreSQL.
+
+### Локальная разработка
+
+Нужны Python 3.12 и uv (Dockerfile использует uv 0.12.23).
+После создания `.env`:
+
+```bash
+docker compose up -d --wait db
+cd backend
+uv sync --locked
+uv run --locked uvicorn app.main:app --env-file ../.env --reload
+```
+
+### Проверки
+
+```bash
+cd backend
+uv run --locked ruff check . ../scripts
+uv run --locked ruff format --check . ../scripts
+uv run --locked pytest -q
+```
+
+Pytest проверяет liveness, readiness при реальном отказе подключения asyncpg,
+Swagger/OpenAPI и настройки окружения. БД для этих проверок не нужна, подмен нет.
+Из корня репозитория полный Docker smoke-тест:
+
+```bash
+python3 scripts/check_docker.py
+```
+
+Скрипт собирает образ, поднимает отдельный Compose project на свободных портах,
+проверяет Python 3.12, PostgreSQL 16, непривилегированного пользователя backend,
+эндпоинты, отказ/таймаут БД, запуск backend без БД и восстановление readiness.
+В конце удаляет только контейнеры, сеть и volume своего временного проекта.
+При необходимости доверенного CA для HTTPS-прокси сборки:
+`DOCKER_BUILD_CA=/path/to/ca-bundle.pem python3 scripts/check_docker.py`.
+
+Ручной сценарий для уже запущенного Compose:
+
+```bash
+curl -i http://localhost:8000/health/live   # 200 {"status":"ok"}
+curl -i http://localhost:8000/health/ready  # 200 {"status":"ok"}, реальный SELECT 1
+docker compose stop db
+curl -i http://localhost:8000/health/live   # 200 {"status":"ok"}
+curl -i http://localhost:8000/health/ready  # 503 {"status":"unavailable"}
+docker compose start db
+# После готовности PostgreSQL следующий запрос снова вернёт 200:
+curl -i http://localhost:8000/health/ready
+```
+
+Операция readiness ограничена `DB_READINESS_TIMEOUT`; при отмене зависшего запроса
+SQLAlchemy/asyncpg может дополнительно потратить до 2 секунд на закрытие соединения
+(при значении по умолчанию ответ приходит примерно за 4 секунды).
+Ответ не раскрывает параметры подключения или текст ошибки драйвера.
+Docker healthcheck backend использует `/health/ready`;
+статус `unhealthy` при отказе БД не останавливает процесс.
