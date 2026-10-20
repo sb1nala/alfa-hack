@@ -1,15 +1,22 @@
 import asyncio
 from contextlib import asynccontextmanager
 from typing import Literal
+from uuid import uuid4
 
 from asyncpg import PostgresError
 from fastapi import FastAPI, Request, Response, status
+from fastapi.exception_handlers import http_exception_handler
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.api import applications, auth, catalog, documents, events, underwriting
+from app.api.contract import DESCRIPTION, error_response, validation_error
 from app.config import Settings
 from app.database import create_engine, create_session_factory
+from app.openapi import install_openapi
 
 
 class HealthResponse(BaseModel):
@@ -30,8 +37,55 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await engine.dispose()
 
     app = FastAPI(
-        title="Умный кредитный кабинет предпринимателя", version="0.1.0", lifespan=lifespan
+        title="Умный кредитный кабинет предпринимателя",
+        version="0.2.0",
+        lifespan=lifespan,
+        description=DESCRIPTION,
+        openapi_tags=[
+            {"name": name}
+            for name in (
+                "auth",
+                "catalog",
+                "applications",
+                "documents",
+                "events",
+                "underwriting",
+                "health",
+            )
+        ],
     )
+
+    @app.middleware("http")
+    async def request_id(request: Request, call_next):
+        request.state.request_id = uuid4()
+        response = await call_next(request)
+        if request.url.path.startswith("/api/") or request.url.path == "/api":
+            response.headers["X-Request-ID"] = str(request.state.request_id)
+        return response
+
+    app.add_exception_handler(RequestValidationError, validation_error)
+
+    @app.exception_handler(StarletteHTTPException)
+    async def business_http_error(request: Request, exc: StarletteHTTPException):
+        if request.url.path.startswith("/api/") or request.url.path == "/api":
+            return error_response(request, exc.status_code)
+        return await http_exception_handler(request, exc)
+
+    @app.exception_handler(Exception)
+    async def unexpected_error(request: Request, exc: Exception):
+        return error_response(request, 500)
+
+    routers = (
+        auth.router,
+        catalog.router,
+        applications.router,
+        documents.router,
+        events.router,
+        underwriting.router,
+    )
+    for router in routers:
+        app.include_router(router)
+    install_openapi(app, routers)
 
     @app.get("/health/live", tags=["health"], response_model=HealthResponse)
     async def live() -> HealthResponse:
