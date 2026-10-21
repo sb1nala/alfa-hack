@@ -119,7 +119,10 @@ def main() -> None:
                 run("unpause", "db")
             wait_ready()
 
-            print("Checking stopped database and backend startup without database", flush=True)
+            print(
+                "Checking stopped database and backend startup without database",
+                flush=True,
+            )
             run("stop", "db")
             check("/health/ready", 503, {"status": "unavailable"})
             check("/health/live", 200, {"status": "ok"})

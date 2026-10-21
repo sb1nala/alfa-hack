@@ -1,0 +1,77 @@
+{
+  "_meta": {
+    "policy_version": "2026-10-21.draft1",
+    "owner": "Риски и данные",
+    "note": "Коды продуктов и целей — из docs/product/ui-texts.ru.json. Ставки условные, для прототипа."
+  },
+  "products": [
+    {
+      "code": "express",
+      "min_amount": "300000.00",
+      "max_amount": "5000000.00",
+      "min_term_months": 3,
+      "max_term_months": 36,
+      "base_rate_percent": "26.0",
+      "collateral": false,
+      "auto_decision_max_amount": null
+    },
+    {
+      "code": "working_capital_line",
+      "min_amount": "1000000.00",
+      "max_amount": "30000000.00",
+      "min_term_months": 3,
+      "max_term_months": 24,
+      "base_rate_percent": "23.0",
+      "collateral": false,
+      "auto_decision_max_amount": null
+    },
+    {
+      "code": "investment",
+      "min_amount": "3000000.00",
+      "max_amount": "100000000.00",
+      "min_term_months": 12,
+      "max_term_months": 84,
+      "base_rate_percent": "21.0",
+      "collateral": true,
+      "auto_decision_max_amount": "15000000.00"
+    },
+    {
+      "code": "overdraft",
+      "min_amount": "100000.00",
+      "max_amount": "10000000.00",
+      "min_term_months": 12,
+      "max_term_months": 12,
+      "base_rate_percent": "25.0",
+      "collateral": false,
+      "auto_decision_max_amount": null,
+      "limit_rule": "не больше 50% среднемесячной выручки"
+    }
+  ],
+  "purposes": {
+    "buy_equipment": [
+      "investment",
+      "express"
+    ],
+    "cash_gap": [
+      "overdraft",
+      "working_capital_line"
+    ],
+    "purchase_goods": [
+      "working_capital_line",
+      "express"
+    ],
+    "expand_business": [
+      "investment"
+    ],
+    "urgent_expenses": [
+      "express",
+      "overdraft"
+    ],
+    "other": [
+      "express",
+      "working_capital_line",
+      "investment",
+      "overdraft"
+    ]
+  }
+}

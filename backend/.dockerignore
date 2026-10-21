@@ -4,3 +4,7 @@
 !pyproject.toml
 !uv.lock
 app/**/__pycache__/
+!alembic.ini
+!alembic/
+!alembic/**
+alembic/**/__pycache__/
