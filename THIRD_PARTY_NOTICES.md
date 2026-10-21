@@ -52,3 +52,18 @@ Runtime-зависимость и новые транзитивные завис
 | [Alembic](https://pypi.org/project/alembic/) | 1.20.0 | MIT | Миграции схемы SQLAlchemy/PostgreSQL |
 | [Mako](https://pypi.org/project/Mako/) | 1.4.3 | MIT | Шаблон генерации миграций Alembic |
 | [MarkupSafe](https://pypi.org/project/MarkupSafe/) | 3.0.4 | BSD-3-Clause | Экранирование в Mako |
+
+## Моки внешних сервисов (#19)
+
+Отдельный сервис `mocks/`; версии и хеши зафиксированы в `mocks/uv.lock`. FastAPI, Starlette, Pydantic и Uvicorn — те же библиотеки, что у бэкенда, без новых лицензий.
+
+| Библиотека | Версия | Лицензия | Использование |
+| --- | --- | --- | --- |
+| [FastAPI](https://pypi.org/project/fastapi/) | 0.156.7 | MIT | HTTP API моков |
+| [Starlette](https://pypi.org/project/starlette/) | 1.9.0 | BSD-3-Clause | ASGI-основа FastAPI |
+| [Pydantic](https://pypi.org/project/pydantic/) | 2.14.1 | MIT | Валидация параметров |
+| [Uvicorn](https://pypi.org/project/uvicorn/) | 0.54.0 | BSD-3-Clause | ASGI-сервер |
+| [HTTPX](https://pypi.org/project/httpx/) | 0.28.1 | BSD-3-Clause | Dev: тестовый клиент |
+| [pytest](https://pypi.org/project/pytest/) | 9.1.1 | MIT | Dev: тесты |
+
+Данные моков синтетические (`seed/companies.json`): ИНН с несуществующим кодом региона `00`, названия и люди вымышлены.
