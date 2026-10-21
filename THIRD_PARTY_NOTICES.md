@@ -102,3 +102,18 @@ Runtime-зависимость и новые транзитивные завис
 | [@types/react-dom](https://www.npmjs.com/package/@types/react-dom) | 18.3.7 | MIT | Dev: типы React DOM |
 | [@types/node](https://www.npmjs.com/package/@types/node) | 24.10.1 | MIT | Dev: типы Node.js для конфигурации Vite |
 | [pnpm](https://www.npmjs.com/package/pnpm) | 11.25.0 | MIT | Менеджер пакетов, версия в packageManager |
+
+## Типизированный API-клиент (#12)
+
+| Библиотека | Версия | Лицензия | Использование |
+| --- | --- | --- | --- |
+| [openapi-fetch](https://www.npmjs.com/package/openapi-fetch) | 0.17.0 | MIT | Типизированные HTTP-запросы по контракту |
+| [openapi-typescript](https://www.npmjs.com/package/openapi-typescript) | 7.13.0 | MIT | Dev: генерация TypeScript-типов из OpenAPI |
+| [Prism CLI](https://www.npmjs.com/package/@stoplight/prism-cli) | 5.16.0 | Apache-2.0 | Dev: локальный mock-сервер OpenAPI и HTTP smoke-проверка |
+
+Версии и integrity-хеши, включая транзитивные зависимости, зафиксированы в
+`frontend/pnpm-lock.yaml`. Генератор и Prism не входят в браузерный bundle.
+Тесты клиента используют встроенный Node.js test runner (без новой библиотеки).
+Транзитивный установочный скрипт `@scarf/scarf` явно отключён, телеметрия при
+установке не запускается. Моковые ответы и аккаунты — только синтетические примеры
+из существующего OpenAPI; новые датасеты и внешние сервисы не добавляются.
