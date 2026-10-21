@@ -1,0 +1,69 @@
+{
+  "_meta": {
+    "owner": "Риски и данные",
+    "note": "Тестовые аккаунты только для локального стенда и демо. Бэкенд хранит хеши паролей."
+  },
+  "underwriters": [
+    {
+      "login": "analyst",
+      "password": "analyst-2026",
+      "display_name": "Кредитный аналитик (демо)"
+    }
+  ],
+  "clients": [
+    {
+      "login": "demo-approve",
+      "password": "demo-2026",
+      "display_name": "ООО «Северный хлеб»",
+      "company_inn": "0086906651"
+    },
+    {
+      "login": "demo-term",
+      "password": "demo-2026",
+      "display_name": "ИП Кузнецова Анна Сергеевна",
+      "company_inn": "003766030007"
+    },
+    {
+      "login": "demo-amount",
+      "password": "demo-2026",
+      "display_name": "ООО «ТехноСклад»",
+      "company_inn": "0099017610"
+    },
+    {
+      "login": "demo-product",
+      "password": "demo-2026",
+      "display_name": "ООО «Автосервис Плюс»",
+      "company_inn": "0014422210"
+    },
+    {
+      "login": "demo-info",
+      "password": "demo-2026",
+      "display_name": "ИП Морозов Илья Дмитриевич",
+      "company_inn": "000104250982"
+    },
+    {
+      "login": "demo-manual",
+      "password": "demo-2026",
+      "display_name": "ООО «СтройМонтаж»",
+      "company_inn": "0085481212"
+    },
+    {
+      "login": "demo-stop",
+      "password": "demo-2026",
+      "display_name": "ООО «Ромашка-Трейд»",
+      "company_inn": "0047119393"
+    },
+    {
+      "login": "demo-risk",
+      "password": "demo-2026",
+      "display_name": "ООО «Вкусная точка»",
+      "company_inn": "0061663020"
+    },
+    {
+      "login": "demo-bki",
+      "password": "demo-2026",
+      "display_name": "ИП Соколов Денис Андреевич",
+      "company_inn": "005849901413"
+    }
+  ]
+}
