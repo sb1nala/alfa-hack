@@ -32,8 +32,13 @@ services:
       AUTH_SESSION_HOURS: ${AUTH_SESSION_HOURS:-8}
       AUTH_ALLOWED_ORIGIN: ${AUTH_ALLOWED_ORIGIN:-http://localhost:8000}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
+      MOCKS_BASE_URL: http://mocks:8000
+      EGRUL_TIMEOUT: ${EGRUL_TIMEOUT:-2}
     volumes:
       - ./seed/accounts.json:/seed/accounts.json:ro
+      - ./seed/companies.json:/seed/companies.json:ro
+      - ./seed/products.json:/seed/products.json:ro
+      - ./docs/product/ui-texts.ru.json:/seed/product-texts.json:ro
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     depends_on:

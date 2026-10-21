@@ -1,11 +1,21 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Header, Query
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request, Response
+from sqlalchemy import func, select, true
+from sqlalchemy.orm import aliased
 
+from app import drafts
 from app.api import examples as ex
 from app.api.contract import endpoint, not_implemented
-from app.dependencies import ApplicationID, accessible_application, owned_application
+from app.dependencies import (
+    ApplicationID,
+    ClientPrincipal,
+    DBSession,
+    accessible_application,
+    owned_application,
+)
+from app.models import Application
 from app.schemas.applications import (
     AcceptOfferRequest,
     AdditionalInfoRequest,
@@ -32,6 +42,7 @@ router = APIRouter(prefix="/api/applications", tags=["applications"])
         "Все поля анкеты можно заполнить позднее; {} — допустимый черновик.",
         mutation=True,
         status_code=201,
+        implemented=True,
         headers={
             "Location": {"schema": {"type": "string"}, "description": "/api/applications/{id}"}
         },
@@ -39,8 +50,20 @@ router = APIRouter(prefix="/api/applications", tags=["applications"])
 )
 async def create_draft(
     body: Annotated[CreateDraftRequest, Body(openapi_examples=ex.examples({"draft": ex.FORM}))],
+    db: DBSession,
+    principal: ClientPrincipal,
+    request: Request,
+    response: Response,
 ) -> ClientApplication:
-    not_implemented()
+    application = Application(owner_id=principal.user.id, status="DRAFT", revision=1)
+    await drafts.apply_fields(db, application, body)
+    db.add(application)
+    await db.flush()
+    await drafts.audit(db, application, principal, request.state.request_id, created=True)
+    result = await drafts.card(db, application)
+    await db.commit()
+    response.headers["Location"] = f"/api/applications/{application.id}"
+    return result
 
 
 @router.get(
@@ -50,13 +73,43 @@ async def create_draft(
         {"applications": ex.page(ex.SUMMARY)},
         "Список только собственных заявок. Сортировка updated_at DESC, id DESC. "
         "offset/limit — пагинация; status — необязательный фильтр.",
+        implemented=True,
     ),
 )
 async def list_applications(
     page: Annotated[PageQuery, Depends()],
+    db: DBSession,
+    principal: ClientPrincipal,
     status: ApplicationStatus | None = None,
 ) -> Page[ClientApplicationSummary]:
-    not_implemented()
+    filters = [Application.owner_id == principal.user.id]
+    if status is not None:
+        filters.append(Application.status == status.value)
+    # A single statement gives total and page the same PostgreSQL MVCC snapshot,
+    # including an empty page beyond the last row.
+    filtered = select(Application).where(*filters).cte("filtered")
+    paged = (
+        select(filtered)
+        .order_by(filtered.c.updated_at.desc(), filtered.c.id.desc())
+        .offset(page.offset)
+        .limit(page.limit)
+        .cte("paged")
+    )
+    total = select(func.count().label("total")).select_from(filtered).cte("total")
+    item = aliased(Application, paged)
+    rows = (
+        await db.execute(
+            select(total.c.total, item)
+            .select_from(total.outerjoin(paged, true()))
+            .order_by(paged.c.updated_at.desc(), paged.c.id.desc())
+        )
+    ).all()
+    return Page(
+        items=[drafts.summary(row) for _, row in rows if row is not None],
+        total=rows[0][0],
+        offset=page.offset,
+        limit=page.limit,
+    )
 
 
 @router.get(
@@ -68,10 +121,15 @@ async def list_applications(
         "allowed_actions. "
         "Банковские факторы и аналитическое объяснение никогда не возвращаются.",
         access=owned_application,
+        implemented=True,
     ),
 )
-async def get_application(application_id: ApplicationID) -> ClientApplication:
-    not_implemented()
+async def get_application(
+    application_id: ApplicationID,
+    db: DBSession,
+    application: Annotated[Application, Depends(owned_application)],
+) -> ClientApplication:
+    return await drafts.card(db, application)
 
 
 @router.patch(
@@ -83,6 +141,7 @@ async def get_application(application_id: ApplicationID) -> ClientApplication:
         "Требуется expected_revision; неверный статус или ревизия — 409.",
         mutation=True,
         access=owned_application,
+        implemented=True,
     ),
 )
 async def edit_application(
@@ -95,8 +154,30 @@ async def edit_application(
             )
         ),
     ],
+    db: DBSession,
+    principal: ClientPrincipal,
+    request: Request,
 ) -> ClientApplication:
-    not_implemented()
+    # Refresh the guard's identity-map entry after taking the row lock: another
+    # request may have committed since the access dependency first read it.
+    application = await db.scalar(
+        select(Application)
+        .where(Application.id == application_id, Application.owner_id == principal.user.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if application is None:
+        raise HTTPException(404)
+    if application.status != "DRAFT" or application.revision != body.expected_revision:
+        raise HTTPException(409)
+    await drafts.apply_fields(db, application, body)
+    application.revision += 1
+    application.updated_at = await db.scalar(select(func.clock_timestamp()))
+    await db.flush()
+    await drafts.audit(db, application, principal, request.state.request_id)
+    result = await drafts.card(db, application)
+    await db.commit()
+    return result
 
 
 @router.post(

@@ -94,6 +94,7 @@ class Product(Identity, Base):
     purposes: Mapped[list[str]] = mapped_column(JSONB)
     version: Mapped[int] = mapped_column(server_default=text("1"))
     active: Mapped[bool] = mapped_column(server_default=text("true"))
+    policy_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
 
 
 class Application(Identity, CreatedAt, Base):

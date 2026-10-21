@@ -38,9 +38,10 @@
 
 ## Запуск
 
-В main завершены B01–B04: инфраструктура, API-контракт, ORM/миграции,
-авторизация и импорт тестовых аккаунтов. Моки и модуль решений добавлены
-участником по рискам; подключение конвейера, бизнес-CRUD, worker и SSE ещё впереди.
+Реализованы B01–B05: инфраструктура, API-контракт, ORM/миграции, авторизация,
+импорт аккаунтов/компаний/продуктов, поиск компании через локальный мок ЕГРЮЛ и CRUD
+черновиков в PostgreSQL. Моки и модуль решений добавлены участником по рискам;
+submit/cancel, подключение конвейера, worker и SSE ещё впереди.
 Текущий статус: [план бэкенда](backend/PLAN.md).
 
 ### Стек и компоненты
@@ -74,16 +75,18 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 
 ```bash
 docker compose up -d --wait db
-docker compose build backend
+docker compose build backend mocks
 docker compose run --rm backend alembic upgrade head
 docker compose run --rm backend alembic check
-docker compose run --rm backend python -m app.seed --accounts /seed/accounts.json
-docker compose up -d --wait backend
+docker compose run --rm backend python -m app.seed \
+  --accounts /seed/accounts.json --companies /seed/companies.json \
+  --products /seed/products.json --product-texts /seed/product-texts.json
+docker compose up -d --wait backend mocks
 ```
 
 Миграции и seed пока выполняются явно; автоматизация первого запуска — B10.
-Импорт повторяемый: первый запуск создаёт 10 аккаунтов, повторный — 0.
-`seed/accounts.json` должен читаться пользователем контейнера UID 10001;
+Импорт атомарный и повторяемый: 10 аккаунтов, 9 компаний, 4 продукта; повтор без дублей.
+UUID/хеши аккаунтов сохраняются. Четыре исходных файла должны читаться UID 10001;
 для нестандартных прав файла см. [инструкцию бэкенда](backend/README.md).
 Для запуска также моков:
 
@@ -134,11 +137,13 @@ docker compose down     # остановить, сохранить данные
 После создания `.env`:
 
 ```bash
-docker compose up -d --wait db
+docker compose up -d --wait db mocks
 cd backend
 uv sync --locked
 uv run --locked --env-file ../.env alembic upgrade head
-uv run --locked --env-file ../.env python -m app.seed --accounts ../seed/accounts.json
+uv run --locked --env-file ../.env python -m app.seed \
+  --accounts ../seed/accounts.json --companies ../seed/companies.json \
+  --products ../seed/products.json --product-texts ../docs/product/ui-texts.ru.json
 uv run --locked uvicorn app.main:app --env-file ../.env --reload
 ```
 

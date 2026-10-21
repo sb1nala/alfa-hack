@@ -98,6 +98,9 @@ def require_role(*roles: str):
     return check
 
 
+ClientPrincipal = Annotated[Principal, Depends(require_role("client"))]
+
+
 async def find_context(
     request: Request, db: AsyncSession, principal: Principal | None, *, lock=False
 ):
