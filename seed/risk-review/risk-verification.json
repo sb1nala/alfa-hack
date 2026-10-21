@@ -1,0 +1,735 @@
+{
+  "source_commit": "0dcf4784ccdb0fd8d13fd22330caf3687fbb3289",
+  "python": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+  "original_seed_checks": [
+    {
+      "key": "approve",
+      "inn": "0086906651",
+      "outcome": "APPROVED",
+      "score": 175,
+      "risk_class": "A",
+      "dscr_requested_at_base_rate": "1.48",
+      "dscr_offer_at_final_rate_using_rounded_payment": "1.477960978430859174926805830",
+      "decision": {
+        "outcome": "APPROVED",
+        "reasons": [],
+        "explanation": "Мы готовы выдать кредит на условиях, которые Вы запросили.",
+        "required_documents": [],
+        "offer": {
+          "product_code": "working_capital_line",
+          "amount": "5000000.00",
+          "term_months": 18,
+          "annual_rate_percent": "23.0",
+          "monthly_payment": "331071.90"
+        },
+        "policy_version": "2026-10-21.draft1",
+        "score": 175,
+        "risk_class": "A",
+        "dscr": "1.48",
+        "scoring_factors": [
+          {
+            "code": "business_age",
+            "value": "7.5 лет",
+            "contribution": "+35",
+            "explanation": "Возраст бизнеса по ЕГРЮЛ/ЕГРИП"
+          },
+          {
+            "code": "revenue",
+            "value": "48.0 млн ₽",
+            "contribution": "+25",
+            "explanation": "Годовая выручка по данным ФНС"
+          },
+          {
+            "code": "dscr",
+            "value": "1.48",
+            "contribution": "+25",
+            "explanation": "Покрытие платежей денежным потоком с новым кредитом"
+          },
+          {
+            "code": "max_overdue_24m",
+            "value": "0 дн.",
+            "contribution": "+30",
+            "explanation": "Максимальная просрочка за 24 месяца, БКИ"
+          },
+          {
+            "code": "overdue_30_plus_count",
+            "value": "0",
+            "contribution": "+10",
+            "explanation": "Число просрочек 30+ дней за 24 месяца, БКИ"
+          },
+          {
+            "code": "bki_inquiries_30d",
+            "value": "1",
+            "contribution": "+10",
+            "explanation": "Запросы кредитной истории за 30 дней, БКИ"
+          },
+          {
+            "code": "tax_arrears",
+            "value": "0.00 ₽",
+            "contribution": "+15",
+            "explanation": "Налоговая задолженность по данным ФНС"
+          },
+          {
+            "code": "mass_address",
+            "value": "нет",
+            "contribution": "+5",
+            "explanation": "Массовый адрес регистрации, ФНС"
+          },
+          {
+            "code": "industry_risk",
+            "value": "10.71 (низкий)",
+            "contribution": "+10",
+            "explanation": "Отраслевой риск по ОКВЭД"
+          },
+          {
+            "code": "amount_to_revenue",
+            "value": "10%",
+            "contribution": "+10",
+            "explanation": "Запрошенная сумма к годовой выручке"
+          }
+        ],
+        "stop_factors": [],
+        "review_reason": null,
+        "analytical_explanation": "Класс A (175 баллов), DSCR 1.48. Запрошенные условия проходят."
+      }
+    },
+    {
+      "key": "counter_term",
+      "inn": "003766030007",
+      "outcome": "COUNTER_OFFER",
+      "score": 130,
+      "risk_class": "B",
+      "dscr_requested_at_base_rate": "0.77",
+      "dscr_offer_at_final_rate_using_rounded_payment": "1.342264615657048169264546616",
+      "decision": {
+        "outcome": "COUNTER_OFFER",
+        "reasons": [
+          {
+            "code": "term_extended",
+            "message": "Мы увеличили срок, чтобы снизить ежемесячный платёж."
+          }
+        ],
+        "explanation": "Мы увеличили срок, чтобы снизить ежемесячный платёж.",
+        "required_documents": [],
+        "offer": {
+          "product_code": "express",
+          "amount": "2500000.00",
+          "term_months": 24,
+          "annual_rate_percent": "27.5",
+          "monthly_payment": "136585.09"
+        },
+        "policy_version": "2026-10-21.draft1",
+        "score": 130,
+        "risk_class": "B",
+        "dscr": "0.77",
+        "scoring_factors": [
+          {
+            "code": "business_age",
+            "value": "5.7 лет",
+            "contribution": "+35",
+            "explanation": "Возраст бизнеса по ЕГРЮЛ/ЕГРИП"
+          },
+          {
+            "code": "revenue",
+            "value": "9.2 млн ₽",
+            "contribution": "+15",
+            "explanation": "Годовая выручка по данным ФНС"
+          },
+          {
+            "code": "dscr",
+            "value": "0.77",
+            "contribution": "+0",
+            "explanation": "Покрытие платежей денежным потоком с новым кредитом"
+          },
+          {
+            "code": "max_overdue_24m",
+            "value": "0 дн.",
+            "contribution": "+30",
+            "explanation": "Максимальная просрочка за 24 месяца, БКИ"
+          },
+          {
+            "code": "overdue_30_plus_count",
+            "value": "0",
+            "contribution": "+10",
+            "explanation": "Число просрочек 30+ дней за 24 месяца, БКИ"
+          },
+          {
+            "code": "bki_inquiries_30d",
+            "value": "0",
+            "contribution": "+10",
+            "explanation": "Запросы кредитной истории за 30 дней, БКИ"
+          },
+          {
+            "code": "tax_arrears",
+            "value": "0.00 ₽",
+            "contribution": "+15",
+            "explanation": "Налоговая задолженность по данным ФНС"
+          },
+          {
+            "code": "mass_address",
+            "value": "нет",
+            "contribution": "+5",
+            "explanation": "Массовый адрес регистрации, ФНС"
+          },
+          {
+            "code": "industry_risk",
+            "value": "96.02 (средний)",
+            "contribution": "+5",
+            "explanation": "Отраслевой риск по ОКВЭД"
+          },
+          {
+            "code": "amount_to_revenue",
+            "value": "27%",
+            "contribution": "+5",
+            "explanation": "Запрошенная сумма к годовой выручке"
+          }
+        ],
+        "stop_factors": [],
+        "review_reason": null,
+        "analytical_explanation": "Класс B (130 баллов), DSCR 0.77. На 12 мес. платёж не проходит, на 24 мес. проходит."
+      }
+    },
+    {
+      "key": "counter_amount",
+      "inn": "0099017610",
+      "outcome": "COUNTER_OFFER",
+      "score": 140,
+      "risk_class": "B",
+      "dscr_requested_at_base_rate": "0.33",
+      "dscr_offer_at_final_rate_using_rounded_payment": "1.200495733668657722454836678",
+      "decision": {
+        "outcome": "COUNTER_OFFER",
+        "reasons": [
+          {
+            "code": "amount_reduced",
+            "message": "Мы можем выдать меньшую сумму — так ежемесячный платёж будет посильным при Вашей выручке."
+          }
+        ],
+        "explanation": "Мы можем выдать меньшую сумму — так ежемесячный платёж будет посильным при Вашей выручке.",
+        "required_documents": [],
+        "offer": {
+          "product_code": "working_capital_line",
+          "amount": "3710000.00",
+          "term_months": 24,
+          "annual_rate_percent": "24.5",
+          "monthly_payment": "197078.84"
+        },
+        "policy_version": "2026-10-21.draft1",
+        "score": 140,
+        "risk_class": "B",
+        "dscr": "0.33",
+        "scoring_factors": [
+          {
+            "code": "business_age",
+            "value": "8.1 лет",
+            "contribution": "+35",
+            "explanation": "Возраст бизнеса по ЕГРЮЛ/ЕГРИП"
+          },
+          {
+            "code": "revenue",
+            "value": "38.0 млн ₽",
+            "contribution": "+25",
+            "explanation": "Годовая выручка по данным ФНС"
+          },
+          {
+            "code": "dscr",
+            "value": "0.33",
+            "contribution": "+0",
+            "explanation": "Покрытие платежей денежным потоком с новым кредитом"
+          },
+          {
+            "code": "max_overdue_24m",
+            "value": "0 дн.",
+            "contribution": "+30",
+            "explanation": "Максимальная просрочка за 24 месяца, БКИ"
+          },
+          {
+            "code": "overdue_30_plus_count",
+            "value": "0",
+            "contribution": "+10",
+            "explanation": "Число просрочек 30+ дней за 24 месяца, БКИ"
+          },
+          {
+            "code": "bki_inquiries_30d",
+            "value": "2",
+            "contribution": "+10",
+            "explanation": "Запросы кредитной истории за 30 дней, БКИ"
+          },
+          {
+            "code": "tax_arrears",
+            "value": "0.00 ₽",
+            "contribution": "+15",
+            "explanation": "Налоговая задолженность по данным ФНС"
+          },
+          {
+            "code": "mass_address",
+            "value": "нет",
+            "contribution": "+5",
+            "explanation": "Массовый адрес регистрации, ФНС"
+          },
+          {
+            "code": "industry_risk",
+            "value": "46.69 (средний)",
+            "contribution": "+5",
+            "explanation": "Отраслевой риск по ОКВЭД"
+          },
+          {
+            "code": "amount_to_revenue",
+            "value": "32%",
+            "contribution": "+5",
+            "explanation": "Запрошенная сумма к годовой выручке"
+          }
+        ],
+        "stop_factors": [],
+        "review_reason": null,
+        "analytical_explanation": "Класс B (140 баллов), DSCR 0.33. Максимальная сумма по лимитам — 3,710,000 ₽ на 24 мес."
+      }
+    },
+    {
+      "key": "counter_product",
+      "inn": "0014422210",
+      "outcome": "COUNTER_OFFER",
+      "score": 155,
+      "risk_class": "A",
+      "dscr_requested_at_base_rate": "1.11",
+      "dscr_offer_at_final_rate_using_rounded_payment": "1.557187581572298218426359486",
+      "decision": {
+        "outcome": "COUNTER_OFFER",
+        "reasons": [
+          {
+            "code": "product_changed",
+            "message": "Для Вашей задачи лучше подходит другой продукт — условия по нему ниже."
+          },
+          {
+            "code": "collateral_required",
+            "message": "Запрошенную сумму мы можем выдать только под залог. Без залога — меньшая сумма."
+          }
+        ],
+        "explanation": "Для Вашей задачи лучше подходит другой продукт — условия по нему ниже. Запрошенную сумму мы можем выдать только под залог. Без залога — меньшая сумма.",
+        "required_documents": [],
+        "offer": {
+          "product_code": "investment",
+          "amount": "5000000.00",
+          "term_months": 84,
+          "annual_rate_percent": "21.0",
+          "monthly_payment": "114061.13"
+        },
+        "policy_version": "2026-10-21.draft1",
+        "score": 155,
+        "risk_class": "A",
+        "dscr": "1.11",
+        "scoring_factors": [
+          {
+            "code": "business_age",
+            "value": "6.3 лет",
+            "contribution": "+35",
+            "explanation": "Возраст бизнеса по ЕГРЮЛ/ЕГРИП"
+          },
+          {
+            "code": "revenue",
+            "value": "30.0 млн ₽",
+            "contribution": "+25",
+            "explanation": "Годовая выручка по данным ФНС"
+          },
+          {
+            "code": "dscr",
+            "value": "1.11",
+            "contribution": "+10",
+            "explanation": "Покрытие платежей денежным потоком с новым кредитом"
+          },
+          {
+            "code": "max_overdue_24m",
+            "value": "0 дн.",
+            "contribution": "+30",
+            "explanation": "Максимальная просрочка за 24 месяца, БКИ"
+          },
+          {
+            "code": "overdue_30_plus_count",
+            "value": "0",
+            "contribution": "+10",
+            "explanation": "Число просрочек 30+ дней за 24 месяца, БКИ"
+          },
+          {
+            "code": "bki_inquiries_30d",
+            "value": "1",
+            "contribution": "+10",
+            "explanation": "Запросы кредитной истории за 30 дней, БКИ"
+          },
+          {
+            "code": "tax_arrears",
+            "value": "0.00 ₽",
+            "contribution": "+15",
+            "explanation": "Налоговая задолженность по данным ФНС"
+          },
+          {
+            "code": "mass_address",
+            "value": "нет",
+            "contribution": "+5",
+            "explanation": "Массовый адрес регистрации, ФНС"
+          },
+          {
+            "code": "industry_risk",
+            "value": "45.20 (средний)",
+            "contribution": "+5",
+            "explanation": "Отраслевой риск по ОКВЭД"
+          },
+          {
+            "code": "amount_to_revenue",
+            "value": "17%",
+            "contribution": "+10",
+            "explanation": "Запрошенная сумма к годовой выручке"
+          }
+        ],
+        "stop_factors": [],
+        "review_reason": null,
+        "analytical_explanation": "Класс A (155 баллов), DSCR 1.11. Продукт express не проходит, подходит investment."
+      }
+    },
+    {
+      "key": "needs_info",
+      "inn": "000104250982",
+      "outcome": "NEEDS_INFO",
+      "score": null,
+      "risk_class": null,
+      "dscr_requested_at_base_rate": null,
+      "dscr_offer_at_final_rate_using_rounded_payment": null,
+      "decision": {
+        "outcome": "NEEDS_INFO",
+        "reasons": [],
+        "explanation": "Чтобы принять решение, нам не хватает нескольких сведений. Ниже — что именно и зачем.",
+        "required_documents": [
+          {
+            "code": "annual_revenue",
+            "title": "Уточните выручку за последние 12 месяцев",
+            "explanation": "Выручка в анкете заметно отличается от данных налоговой службы. Укажите точную сумму."
+          },
+          {
+            "code": "bank_statement_12m",
+            "title": "Выписка по расчётному счёту за 12 месяцев",
+            "explanation": "Чтобы подтвердить выручку, если основной счёт компании открыт в другом банке."
+          }
+        ],
+        "offer": null,
+        "policy_version": "2026-10-21.draft1",
+        "score": null,
+        "risk_class": null,
+        "dscr": null,
+        "scoring_factors": [],
+        "stop_factors": [],
+        "review_reason": null,
+        "analytical_explanation": "Недостаточно данных: annual_revenue, bank_statement_12m."
+      }
+    },
+    {
+      "key": "manual",
+      "inn": "0085481212",
+      "outcome": "MANUAL_REVIEW",
+      "score": 65,
+      "risk_class": "D",
+      "dscr_requested_at_base_rate": "1.06",
+      "dscr_offer_at_final_rate_using_rounded_payment": null,
+      "decision": {
+        "outcome": "MANUAL_REVIEW",
+        "reasons": [],
+        "explanation": "Ваша заявка требует внимательного рассмотрения. Её изучает кредитный специалист банка.",
+        "required_documents": [],
+        "offer": null,
+        "policy_version": "2026-10-21.draft1",
+        "score": 65,
+        "risk_class": "D",
+        "dscr": "1.06",
+        "scoring_factors": [
+          {
+            "code": "business_age",
+            "value": "4.4 лет",
+            "contribution": "+25",
+            "explanation": "Возраст бизнеса по ЕГРЮЛ/ЕГРИП"
+          },
+          {
+            "code": "revenue",
+            "value": "60.0 млн ₽",
+            "contribution": "+25",
+            "explanation": "Годовая выручка по данным ФНС"
+          },
+          {
+            "code": "dscr",
+            "value": "1.06",
+            "contribution": "+10",
+            "explanation": "Покрытие платежей денежным потоком с новым кредитом"
+          },
+          {
+            "code": "max_overdue_24m",
+            "value": "45 дн.",
+            "contribution": "+0",
+            "explanation": "Максимальная просрочка за 24 месяца, БКИ"
+          },
+          {
+            "code": "overdue_30_plus_count",
+            "value": "1",
+            "contribution": "+0",
+            "explanation": "Число просрочек 30+ дней за 24 месяца, БКИ"
+          },
+          {
+            "code": "bki_inquiries_30d",
+            "value": "6",
+            "contribution": "-10",
+            "explanation": "Запросы кредитной истории за 30 дней, БКИ"
+          },
+          {
+            "code": "tax_arrears",
+            "value": "80000.00 ₽",
+            "contribution": "+0",
+            "explanation": "Налоговая задолженность по данным ФНС"
+          },
+          {
+            "code": "mass_address",
+            "value": "нет",
+            "contribution": "+5",
+            "explanation": "Массовый адрес регистрации, ФНС"
+          },
+          {
+            "code": "industry_risk",
+            "value": "43.21 (высокий)",
+            "contribution": "+0",
+            "explanation": "Отраслевой риск по ОКВЭД"
+          },
+          {
+            "code": "amount_to_revenue",
+            "value": "13%",
+            "contribution": "+10",
+            "explanation": "Запрошенная сумма к годовой выручке"
+          }
+        ],
+        "stop_factors": [],
+        "review_reason": "gray_zone",
+        "analytical_explanation": "Класс D (65 баллов), DSCR 1.06. Серая зона — решение аналитика."
+      }
+    },
+    {
+      "key": "reject_stop",
+      "inn": "0047119393",
+      "outcome": "REJECTED",
+      "score": null,
+      "risk_class": null,
+      "dscr_requested_at_base_rate": null,
+      "dscr_offer_at_final_rate_using_rounded_payment": null,
+      "decision": {
+        "outcome": "REJECTED",
+        "reasons": [
+          {
+            "code": "company_liquidating",
+            "message": "По данным ЕГРЮЛ компания находится в процессе ликвидации или реорганизации."
+          }
+        ],
+        "explanation": "По данным ЕГРЮЛ компания находится в процессе ликвидации или реорганизации. Мы сможем рассмотреть заявку, когда статус компании в реестре станет «Действующая».",
+        "required_documents": [],
+        "offer": null,
+        "policy_version": "2026-10-21.draft1",
+        "score": null,
+        "risk_class": null,
+        "dscr": null,
+        "scoring_factors": [],
+        "stop_factors": [
+          "company_liquidating"
+        ],
+        "review_reason": null,
+        "analytical_explanation": "Стоп-факторы: company_liquidating. Скоринг не проводился."
+      }
+    },
+    {
+      "key": "reject_score",
+      "inn": "0061663020",
+      "outcome": "REJECTED",
+      "score": 30,
+      "risk_class": "E",
+      "dscr_requested_at_base_rate": "0.2",
+      "dscr_offer_at_final_rate_using_rounded_payment": null,
+      "decision": {
+        "outcome": "REJECTED",
+        "reasons": [
+          {
+            "code": "high_risk",
+            "message": "По совокупности данных о компании риск оказался выше, чем мы можем принять сейчас."
+          }
+        ],
+        "explanation": "По совокупности данных о компании риск оказался выше, чем мы можем принять сейчас. Можно подать новую заявку через 3 месяца или на меньшую сумму.",
+        "required_documents": [],
+        "offer": null,
+        "policy_version": "2026-10-21.draft1",
+        "score": 30,
+        "risk_class": "E",
+        "dscr": "0.2",
+        "scoring_factors": [
+          {
+            "code": "business_age",
+            "value": "3.8 лет",
+            "contribution": "+25",
+            "explanation": "Возраст бизнеса по ЕГРЮЛ/ЕГРИП"
+          },
+          {
+            "code": "revenue",
+            "value": "10.5 млн ₽",
+            "contribution": "+15",
+            "explanation": "Годовая выручка по данным ФНС"
+          },
+          {
+            "code": "dscr",
+            "value": "0.20",
+            "contribution": "+0",
+            "explanation": "Покрытие платежей денежным потоком с новым кредитом"
+          },
+          {
+            "code": "max_overdue_24m",
+            "value": "60 дн.",
+            "contribution": "+0",
+            "explanation": "Максимальная просрочка за 24 месяца, БКИ"
+          },
+          {
+            "code": "overdue_30_plus_count",
+            "value": "2",
+            "contribution": "-15",
+            "explanation": "Число просрочек 30+ дней за 24 месяца, БКИ"
+          },
+          {
+            "code": "bki_inquiries_30d",
+            "value": "7",
+            "contribution": "-10",
+            "explanation": "Запросы кредитной истории за 30 дней, БКИ"
+          },
+          {
+            "code": "tax_arrears",
+            "value": "150000.00 ₽",
+            "contribution": "+0",
+            "explanation": "Налоговая задолженность по данным ФНС"
+          },
+          {
+            "code": "mass_address",
+            "value": "нет",
+            "contribution": "+5",
+            "explanation": "Массовый адрес регистрации, ФНС"
+          },
+          {
+            "code": "industry_risk",
+            "value": "56.10 (высокий)",
+            "contribution": "+0",
+            "explanation": "Отраслевой риск по ОКВЭД"
+          },
+          {
+            "code": "amount_to_revenue",
+            "value": "19%",
+            "contribution": "+10",
+            "explanation": "Запрошенная сумма к годовой выручке"
+          }
+        ],
+        "stop_factors": [],
+        "review_reason": null,
+        "analytical_explanation": "Класс E (30 баллов), DSCR 0.20. Риск выше допустимого."
+      }
+    },
+    {
+      "key": "bki_failure",
+      "inn": "005849901413",
+      "outcome": "APPROVED",
+      "score": 170,
+      "risk_class": "A",
+      "dscr_requested_at_base_rate": "1.93",
+      "dscr_offer_at_final_rate_using_rounded_payment": "1.933977115635586107236710289",
+      "decision": {
+        "outcome": "APPROVED",
+        "reasons": [],
+        "explanation": "Мы готовы выдать кредит на условиях, которые Вы запросили.",
+        "required_documents": [],
+        "offer": {
+          "product_code": "express",
+          "amount": "1500000.00",
+          "term_months": 24,
+          "annual_rate_percent": "26.0",
+          "monthly_payment": "80811.85"
+        },
+        "policy_version": "2026-10-21.draft1",
+        "score": 170,
+        "risk_class": "A",
+        "dscr": "1.93",
+        "scoring_factors": [
+          {
+            "code": "business_age",
+            "value": "10.2 лет",
+            "contribution": "+35",
+            "explanation": "Возраст бизнеса по ЕГРЮЛ/ЕГРИП"
+          },
+          {
+            "code": "revenue",
+            "value": "20.0 млн ₽",
+            "contribution": "+15",
+            "explanation": "Годовая выручка по данным ФНС"
+          },
+          {
+            "code": "dscr",
+            "value": "1.93",
+            "contribution": "+35",
+            "explanation": "Покрытие платежей денежным потоком с новым кредитом"
+          },
+          {
+            "code": "max_overdue_24m",
+            "value": "0 дн.",
+            "contribution": "+30",
+            "explanation": "Максимальная просрочка за 24 месяца, БКИ"
+          },
+          {
+            "code": "overdue_30_plus_count",
+            "value": "0",
+            "contribution": "+10",
+            "explanation": "Число просрочек 30+ дней за 24 месяца, БКИ"
+          },
+          {
+            "code": "bki_inquiries_30d",
+            "value": "1",
+            "contribution": "+10",
+            "explanation": "Запросы кредитной истории за 30 дней, БКИ"
+          },
+          {
+            "code": "tax_arrears",
+            "value": "0.00 ₽",
+            "contribution": "+15",
+            "explanation": "Налоговая задолженность по данным ФНС"
+          },
+          {
+            "code": "mass_address",
+            "value": "нет",
+            "contribution": "+5",
+            "explanation": "Массовый адрес регистрации, ФНС"
+          },
+          {
+            "code": "industry_risk",
+            "value": "49.41 (средний)",
+            "contribution": "+5",
+            "explanation": "Отраслевой риск по ОКВЭД"
+          },
+          {
+            "code": "amount_to_revenue",
+            "value": "8%",
+            "contribution": "+10",
+            "explanation": "Запрошенная сумма к годовой выручке"
+          }
+        ],
+        "stop_factors": [],
+        "review_reason": null,
+        "analytical_explanation": "Класс A (170 баллов), DSCR 1.93. Запрошенные условия проходят."
+      }
+    }
+  ],
+  "exported_companies": 8,
+  "all_five_outcomes": true,
+  "all_exported_inn_checksums_valid": true,
+  "zero_revenue_reproduction": "ZeroDivisionError: float division by zero",
+  "missing_pb_fields_default_to": {
+    "tax_arrears": "0.00",
+    "mass_address": false,
+    "director_disqualified": false
+  },
+  "test_runs": {
+    "decision": "56 passed",
+    "mocks": "18 passed, 1 dependency deprecation warning"
+  },
+  "limits": "Decision tests run without parent conftest: no PostgreSQL integration. Docker/E2E not run. Dependencies resolved from declared ranges in a local Python 3.12 environment."
+}
