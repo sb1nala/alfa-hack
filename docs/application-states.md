@@ -22,6 +22,14 @@ stateDiagram-v2
     APPROVED --> OFFER_ACCEPTED: клиент принял условия
     COUNTER_OFFER --> OFFER_ACCEPTED: клиент принял контрпредложение
     COUNTER_OFFER --> CANCELLED: клиент отказался
+    DRAFT --> CANCELLED: клиент отозвал
+    SUBMITTED --> CANCELLED: клиент отозвал
+    CHECKING --> CANCELLED: клиент отозвал
+    SCORING --> CANCELLED: клиент отозвал
+    NEEDS_INFO --> CANCELLED: клиент отозвал
+    MANUAL_REVIEW --> CANCELLED: клиент отозвал
+    APPROVED --> CANCELLED: клиент отказался
+    OFFER_ACCEPTED --> CANCELLED: клиент отозвал
     OFFER_ACCEPTED --> SIGNED: подписание (симуляция)
     SIGNED --> ISSUED: выдача (симуляция)
     REJECTED --> [*]
@@ -29,7 +37,9 @@ stateDiagram-v2
     CANCELLED --> [*]
 ```
 
-Клиент может отозвать заявку в `CANCELLED` из любого статуса до `SIGNED`.
+Отмена клиентом: `CANCELLED` доступен из всех активных статусов до `SIGNED` — `DRAFT`, `SUBMITTED`, `CHECKING`, `SCORING`, `NEEDS_INFO`, `MANUAL_REVIEW`, `APPROVED`, `COUNTER_OFFER`, `OFFER_ACCEPTED`. Конечные статусы — `REJECTED`, `ISSUED`, `CANCELLED`: из них переходов нет. После `SIGNED` отменить нельзя.
+
+Если клиент отменил заявку во время `CHECKING` или `SCORING`, результат worker к ней не применяется (проверка по ревизии, см. `docs/data-model.md`).
 
 | Статус | Что видит клиент | Кто переводит дальше |
 | --- | --- | --- |
