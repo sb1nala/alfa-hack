@@ -38,7 +38,7 @@ def test_swagger_and_openapi(client):
     response = client.get("/openapi.json")
     assert response.status_code == 200
     paths = response.json()["paths"]
-    assert set(paths) == {"/health/live", "/health/ready"}
+    assert {"/health/live", "/health/ready"} <= set(paths)
     assert "503" in paths["/health/ready"]["get"]["responses"]
 
 

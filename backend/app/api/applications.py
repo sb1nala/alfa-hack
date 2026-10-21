@@ -1,0 +1,284 @@
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Body, Depends, Header, Path, Query
+
+from app.api import examples as ex
+from app.api.contract import endpoint, not_implemented
+from app.schemas.applications import (
+    AcceptOfferRequest,
+    AdditionalInfoRequest,
+    CancelRequest,
+    ClientApplication,
+    ClientApplicationSummary,
+    CreateDraftRequest,
+    EditDraftRequest,
+    EventList,
+    SignRequest,
+    SubmitRequest,
+)
+from app.schemas.common import ApplicationStatus, Page, PageQuery
+
+router = APIRouter(prefix="/api/applications", tags=["applications"])
+ApplicationID = Annotated[UUID, Path(examples=[ex.APPLICATION_ID])]
+
+
+@router.post(
+    "",
+    **endpoint(
+        ClientApplication,
+        {"draft": ex.APPLICATION},
+        "Создать частичный черновик DRAFT, revision=1, владелец — текущий client. "
+        "Все поля анкеты можно заполнить позднее; {} — допустимый черновик.",
+        mutation=True,
+        status_code=201,
+        headers={
+            "Location": {"schema": {"type": "string"}, "description": "/api/applications/{id}"}
+        },
+    ),
+)
+async def create_draft(
+    body: Annotated[CreateDraftRequest, Body(openapi_examples=ex.examples({"draft": ex.FORM}))],
+) -> ClientApplication:
+    not_implemented()
+
+
+@router.get(
+    "",
+    **endpoint(
+        Page[ClientApplicationSummary],
+        {"applications": ex.page(ex.SUMMARY)},
+        "Список только собственных заявок. Сортировка updated_at DESC, id DESC. "
+        "offset/limit — пагинация; status — необязательный фильтр.",
+    ),
+)
+async def list_applications(
+    page: Annotated[PageQuery, Depends()],
+    status: ApplicationStatus | None = None,
+) -> Page[ClientApplicationSummary]:
+    not_implemented()
+
+
+@router.get(
+    "/{application_id}",
+    **endpoint(
+        ClientApplication,
+        ex.APPLICATION_EXAMPLES,
+        "Карточка собственной заявки. Последнее публичное решение, status, revision, "
+        "allowed_actions. "
+        "Банковские факторы и аналитическое объяснение никогда не возвращаются.",
+    ),
+)
+async def get_application(application_id: ApplicationID) -> ClientApplication:
+    not_implemented()
+
+
+@router.patch(
+    "/{application_id}",
+    **endpoint(
+        ClientApplication,
+        {"edited": {**ex.APPLICATION, "revision": 2}},
+        "Редактировать анкету только в DRAFT. Меняются только переданные поля; null очищает поле. "
+        "Требуется expected_revision; неверный статус или ревизия — 409.",
+        mutation=True,
+    ),
+)
+async def edit_application(
+    application_id: ApplicationID,
+    body: Annotated[
+        EditDraftRequest,
+        Body(
+            openapi_examples=ex.examples(
+                {"edit": {**ex.REVISION, "purpose": "Пополнение оборотных средств"}}
+            )
+        ),
+    ],
+) -> ClientApplication:
+    not_implemented()
+
+
+@router.post(
+    "/{application_id}/submit",
+    **endpoint(
+        ClientApplication,
+        {
+            "submitted": {
+                **ex.APPLICATION,
+                "status": "SUBMITTED",
+                "revision": 2,
+                "allowed_actions": ["cancel"],
+            }
+        },
+        "Отправка DRAFT → SUBMITTED, 202: конвейер запустится асинхронно позднее. "
+        "expected_revision обязателен. Idempotency-Key — UUID, генерирует клиент для "
+        "одной попытки. "
+        "Будущее поведение: область ключа (пользователь, заявка, submit), хранение "
+        "минимум 24 часа; "
+        "тот же ключ + тот же JSON-запрос возвращает исходный 202 и снимок ответа "
+        "без новой отправки "
+        "(проверка повтора до ревизии); тот же ключ + другой запрос — 409; "
+        "другой ключ при устаревшей ревизии/не-DRAFT — 409. Проверка и запись атомарны. "
+        "Полнота анкеты и согласие на проверки будут проверяться при реализации.",
+        mutation=True,
+        status_code=202,
+    ),
+)
+async def submit_application(
+    application_id: ApplicationID,
+    body: Annotated[
+        SubmitRequest,
+        Body(openapi_examples=ex.examples({"submit": {**ex.REVISION, "consent_to_checks": True}})),
+    ],
+    idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key", examples=[ex.EVENT_ID])],
+) -> ClientApplication:
+    not_implemented()
+
+
+@router.post(
+    "/{application_id}/cancel",
+    **endpoint(
+        ClientApplication,
+        {
+            "cancelled": {
+                **ex.APPLICATION,
+                "status": "CANCELLED",
+                "revision": 2,
+                "allowed_actions": [],
+            }
+        },
+        "Отмена заявки → CANCELLED. Требуется expected_revision. Неоднозначность "
+        "отмены в документе "
+        "статусов и рекомендуемый список состояний описаны в общем описании API; "
+        "согласовать до реализации.",
+        mutation=True,
+    ),
+)
+async def cancel_application(
+    application_id: ApplicationID,
+    body: Annotated[CancelRequest, Body(openapi_examples=ex.examples({"cancel": ex.REVISION}))],
+) -> ClientApplication:
+    not_implemented()
+
+
+@router.post(
+    "/{application_id}/accept-offer",
+    **endpoint(
+        ClientApplication,
+        {
+            "accepted": {
+                **ex.APPLICATION_EXAMPLES["approved"],
+                "status": "OFFER_ACCEPTED",
+                "revision": 6,
+                "allowed_actions": ["sign", "cancel"],
+                "accepted_offer_id": ex.OFFER_ID,
+            }
+        },
+        "Принять актуальный offer_id: APPROVED/COUNTER_OFFER → OFFER_ACCEPTED. "
+        "expected_revision обязателен; чужое/устаревшее предложение или неверный статус — 409.",
+        mutation=True,
+    ),
+)
+async def accept_offer(
+    application_id: ApplicationID,
+    body: Annotated[
+        AcceptOfferRequest,
+        Body(
+            openapi_examples=ex.examples(
+                {"accept": {"expected_revision": 5, "offer_id": ex.OFFER_ID}}
+            )
+        ),
+    ],
+) -> ClientApplication:
+    not_implemented()
+
+
+@router.post(
+    "/{application_id}/additional-info",
+    **endpoint(
+        ClientApplication,
+        {
+            "checking": {
+                **ex.APPLICATION_EXAMPLES["needs_info"],
+                "status": "CHECKING",
+                "revision": 6,
+                "allowed_actions": ["cancel"],
+            }
+        },
+        "Дополнительные данные: NEEDS_INFO → CHECKING. Документы предварительно загружаются, "
+        "document_ids должны принадлежать этой заявке. expected_revision — после загрузок. "
+        "Последнее решение сохраняется до появления нового.",
+        mutation=True,
+        status_code=202,
+    ),
+)
+async def additional_info(
+    application_id: ApplicationID,
+    body: Annotated[
+        AdditionalInfoRequest,
+        Body(
+            openapi_examples=ex.examples(
+                {
+                    "info": {
+                        "expected_revision": 5,
+                        "comment": "Документ добавлен",
+                        "document_ids": [ex.DOCUMENT_ID],
+                    }
+                }
+            )
+        ),
+    ],
+) -> ClientApplication:
+    not_implemented()
+
+
+@router.post(
+    "/{application_id}/sign",
+    **endpoint(
+        ClientApplication,
+        {
+            "signed": {
+                **ex.APPLICATION_EXAMPLES["approved"],
+                "status": "SIGNED",
+                "revision": 7,
+                "allowed_actions": [],
+                "accepted_offer_id": ex.OFFER_ID,
+            }
+        },
+        "Симуляция подписания: OFFER_ACCEPTED → SIGNED. offer_id должен совпадать с принятым. "
+        "Выдача SIGNED → ISSUED — будущая системная операция, отдельный клиентский "
+        "endpoint не нужен.",
+        mutation=True,
+    ),
+)
+async def sign(
+    application_id: ApplicationID,
+    body: Annotated[
+        SignRequest,
+        Body(
+            openapi_examples=ex.examples(
+                {"sign": {"expected_revision": 6, "offer_id": ex.OFFER_ID, "consent": True}}
+            )
+        ),
+    ],
+) -> ClientApplication:
+    not_implemented()
+
+
+@router.get(
+    "/{application_id}/history",
+    **endpoint(
+        EventList,
+        {"history": {"items": [ex.EVENT], "next_cursor": None}},
+        "Публичная история по возрастанию ревизии и внутренней последовательности событий. "
+        "cursor — исключительная нижняя граница; next_cursor — для следующей страницы. "
+        "Внутренние факторы, авторы банковских решений и сырые ответы моков исключены.",
+        role="both",
+        extra_errors=(410,),
+    ),
+)
+async def history(
+    application_id: ApplicationID,
+    cursor: Annotated[UUID | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> EventList:
+    not_implemented()
