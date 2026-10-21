@@ -2,7 +2,7 @@
 
 > Обновлено: 21 октября 2026, МСК. Основание B04 — актуальный `main` на коммите
 > [`0f156a5`](https://github.com/sb1nala/alfa-hack/commit/0f156a5).
-> **Завершены B01–B03 (B03 — PR #41). B04 — На ревью; ближайший этап B05.**
+> **Завершены B01–B03 (B03 — PR #41). B04 — [На ревью, PR #49](https://github.com/sb1nala/alfa-hack/pull/49); ближайший этап B05.**
 > Рабочего сквозного кредитного сценария ещё нет.
 
 ## Что уже доступно команде
@@ -56,7 +56,7 @@ ORM и начальную миграцию (PR #41); B04 добавляет се
 | B01 | Готово | FastAPI и PostgreSQL в Docker | — | Часть [#1](https://github.com/sb1nala/alfa-hack/issues/1); PR #32 |
 | B02 | Готово | API-заглушки, OpenAPI и модель данных v1 | B01 | [#2](https://github.com/sb1nala/alfa-hack/issues/2), документ из [#3](https://github.com/sb1nala/alfa-hack/issues/3); PR #33 |
 | B03 | Готово | ORM-модели и начальные миграции | B02 | [PR #41](https://github.com/sb1nala/alfa-hack/pull/41); продолжение #3; основа [#8](https://github.com/sb1nala/alfa-hack/issues/8) |
-| B04 | На ревью | JWT, роли, CSRF и импорт тестовых аккаунтов | B03; данные рисков | [#7](https://github.com/sb1nala/alfa-hack/issues/7) |
+| B04 | На ревью | JWT, роли, CSRF и импорт тестовых аккаунтов | B03; данные рисков | [#7](https://github.com/sb1nala/alfa-hack/issues/7); [PR #49](https://github.com/sb1nala/alfa-hack/pull/49) |
 | B05 | Запланировано | Реальный API продуктов, черновиков и карточки | B04; контракт ЕГРЮЛ | #2: замена заглушек; отдельного Issue реализации CRUD пока нет |
 | B06 | Запланировано | Переходы, аудит, submit и очередь | B05; уточнение отмены | [#4](https://github.com/sb1nala/alfa-hack/issues/4), часть [#9](https://github.com/sb1nala/alfa-hack/issues/9) |
 | B07 | Запланировано | Worker, проверки и восстановление заданий | B06; моки рисков | Часть [#5](https://github.com/sb1nala/alfa-hack/issues/5) |
