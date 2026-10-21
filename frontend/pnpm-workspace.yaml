@@ -1,0 +1,4 @@
+# pnpm записал исключение возраста релиза для закреплённой версии Vite.
+# Все версии и integrity-хеши остаются в pnpm-lock.yaml.
+minimumReleaseAgeExclude:
+  - vite@8.3.5
