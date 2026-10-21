@@ -61,7 +61,7 @@ B05 явно импортирует 10 аккаунтов, 9 компаний и
 | B04 | Готово | JWT, роли, CSRF и импорт тестовых аккаунтов | B03; данные рисков | [#7](https://github.com/sb1nala/alfa-hack/issues/7); [PR #49](https://github.com/sb1nala/alfa-hack/pull/49) |
 | B05 | Готово | Реальный API продуктов, черновиков и карточки | B04; локальный мок ЕГРЮЛ #48 | [PR #53](https://github.com/sb1nala/alfa-hack/pull/53); #2: замена шести заглушек |
 | B06 | Готово | Переходы, аудит, submit/cancel и очередь | B05; актуальная диаграмма отмены | [PR #55](https://github.com/sb1nala/alfa-hack/pull/55), слит; [#4](https://github.com/sb1nala/alfa-hack/issues/4), часть [#9](https://github.com/sb1nala/alfa-hack/issues/9) |
-| B07 | На ревью | Worker, проверки и восстановление заданий | B06; моки рисков | Часть [#5](https://github.com/sb1nala/alfa-hack/issues/5) |
+| B07 | На ревью | Worker, проверки и восстановление заданий | B06; моки рисков | [PR #57](https://github.com/sb1nala/alfa-hack/pull/57); часть [#5](https://github.com/sb1nala/alfa-hack/issues/5) |
 | B08 | Запланировано | Интеграция decide() и сохранение решения | B07; модуль рисков | Завершение #5 |
 | B09 | Запланировано | История и настоящий SSE | B04, B06–B08; nginx фронтенда | [#6](https://github.com/sb1nala/alfa-hack/issues/6) |
 | B10 | Запланировано | Сквозной Docker-сценарий | B01–B09; frontend и mocks | #8; часть #9 |
@@ -259,7 +259,7 @@ Docker smoke прошёл: миграции, повторный seed, auth, ре
 - **Готовность:** два worker не фиксируют два результата; перезапуск не теряет задания; зависший исполнитель восстанавливается по lease; сетевые вызовы не держат транзакционные блокировки; таймаут/500 мока приводит к повтору, а не отказу в кредите.
 
 
-### Реализация B07 — на ревью
+### Реализация B07 — на ревью ([PR #57](https://github.com/sb1nala/alfa-hack/pull/57))
 
 Ветка `feat/backend-worker` от main dce3718 (B06/#55 и исправление #56 слиты).
 Отдельный процесс `python -m app.worker`, PostgreSQL SKIP LOCKED/lease/fencing,
