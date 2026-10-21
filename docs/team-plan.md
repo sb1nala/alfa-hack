@@ -62,7 +62,7 @@
 
 ```text
 В репо sb1nala/alfa-hack создай frontend/: Vite + React 18 + TypeScript, pnpm, React Router, TanStack Query, MUI.
-Два раздела: /client (кабинет предпринимателя) и /bank (кабинет кредитного аналитика), вход по логину/паролю, JWT в памяти.
+Два раздела: /client (кабинет предпринимателя) и /bank (кабинет кредитного аналитика), вход по логину/паролю. Сессия — JWT в HttpOnly cookie + CSRF-токен в заголовке X-CSRF-Token, точные правила в docs/openapi.yaml.
 Экраны клиента: подбор продукта по цели, анкета (ИНН → автозаполнение), статус-таймлайн, решение.
 Типы API генерируй из docs/openapi.yaml через openapi-typescript. Статус заявки слушай через EventSource.
 Добавь Dockerfile (multi-stage, nginx с прокси /api → http://backend:8000). Тексты — на русском, без банковского жаргона.
