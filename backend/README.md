@@ -1,10 +1,10 @@
 # Backend
 
 Python 3.12, FastAPI, async SQLAlchemy 2/asyncpg, PostgreSQL 16, Alembic, uv.
-B04 реализует `GET /api/auth/csrf`, `POST /api/auth/login`, `GET /api/auth/me`,
-`POST /api/auth/logout`, JWT-сессии, CSRF, роли и зависимости доступа к ресурсам.
-Остальные бизнес-операции после проверки доступа возвращают `501`; CRUD, фильтрация
-списков, хранение файлов и SSE ещё не реализованы. Следующий этап — B05.
+B01–B05: авторизация, JWT-сессии, CSRF, роли, каталог продуктов, поиск компании через
+локальный мок ЕГРЮЛ и черновики в PostgreSQL (создать, список, карточка, PATCH).
+Переходы submit/cancel, банковская очередь, worker, файлы и SSE пока возвращают `501`
+после проверок доступа. Следующий этап — B06.
 Контракт: `../docs/openapi.yaml`.
 
 ## Настройки авторизации
@@ -48,11 +48,13 @@ JWT содержит sub, role, sid, iat, exp, iss, aud. Сервер на ка�
 
 ```bash
 docker compose up -d --wait db
-docker compose build backend
+docker compose build backend mocks
 docker compose run --rm backend alembic upgrade head
 docker compose run --rm backend alembic check
-docker compose run --rm backend python -m app.seed --accounts /seed/accounts.json
-docker compose up -d --wait backend
+docker compose run --rm backend python -m app.seed \
+  --accounts /seed/accounts.json --companies /seed/companies.json \
+  --products /seed/products.json --product-texts /seed/product-texts.json
+docker compose up -d --wait backend mocks
 ```
 
 Образ содержит Alembic и миграции, работает от пользователя `app` (UID 10001).
@@ -96,7 +98,7 @@ Compose — `db:5432`. URL собирается через SQLAlchemy `URL.creat
 существующий хеш/пароль. Конфликт роли откатывает весь импорт с безопасной ошибкой.
 Отчёт содержит только количества; пароли не печатаются. `company_inn` игнорируется:
 это контекст демо, права определяются `applications.owner_id`, связи user → company нет.
-Компании, продукты и сценарии этим импортом не загружаются.
+Без дополнительных флагов компании, продукты и сценарии не загружаются.
 
 ```bash
 # Из корня, после миграций:
@@ -145,8 +147,83 @@ underwriter, принадлежность документа заявке. Бе�
 403, чужая/отсутствующая заявка или документ — 404. Подмена document_id из другой
 заявки не проходит даже при доступе к заявке из URL. Банковские операции доступны
 только underwriter; клиентские команды изменения заявки ему запрещены.
-Разрешённые операции пока доходят до 501. Реальная фильтрация списка, создание и
-редактирование заявок, бизнес-переходы, аудит, файлы и поток SSE идут далее.
+Продукты, поиск компании и CRUD черновиков реализованы в B05. Бизнес-переходы,
+файлы и поток SSE идут далее; эти заглушки после проверок доступа возвращают 501.
+
+## B05: компании, продукты и черновики
+
+Полный импорт выше загружает 10 аккаунтов, 9 компаний и 4 продукта одной транзакцией.
+Можно выбрать отдельные источники; прежняя команда `--accounts` сохранена.
+Повтор сохраняет UUID и хеши аккаунтов, UUID компаний/продуктов, не создаёт дубли и
+не меняет версию неизменённого продукта. Конфликт/ошибка откатывает все выбранные
+источники. Импорты сериализуются PostgreSQL advisory lock. Сценарии заявок и решения
+из seed не импортируются.
+
+Названия/описания берутся из `docs/product/ui-texts.ru.json`, цели и кредитные
+условия — только из `seed/products.json` владельца рисков. `products.policy_snapshot`
+сохраняет исходные строки условий и `policy_version`; изменение данных повышает
+`products.version`. Миграция `b05_product_policy` добавляет только nullable JSONB,
+старые миграции не изменены. Каталог отдаёт только публичные поля и активные продукты,
+по code/id. Условия не проверяются при сохранении частичного черновика; полнота и
+кредитная допустимость относятся к submit/решению следующих этапов.
+
+Локальный импорт из `backend/`:
+
+```bash
+uv run --locked --env-file ../.env python -m app.seed \
+  --accounts ../seed/accounts.json --companies ../seed/companies.json \
+  --products ../seed/products.json --product-texts ../docs/product/ui-texts.ru.json
+```
+
+Compose монтирует все четыре источника read-only. Как и accounts, они должны
+читаться UID 10001; для checkout с режимом 0600 используйте временные читаемые копии.
+`MOCKS_BASE_URL` локально — `http://localhost:8001`, внутри Compose — `http://mocks:8000`.
+`EGRUL_TIMEOUT=2` ограничивает весь запрос и HTTP I/O (0.1–10 секунд). Поиск всегда
+обращается к `/egrul/{inn}` локального мока, исключает status/director из публичного
+ответа. Только 404 источника превращается в `200 {"company": null}`. Таймаут, сбой,
+невалидный ответ или несовпадение ИНН дают существующий контрактный `500 INTERNAL_ERROR`.
+БД-транзакция авторизации завершается до HTTP; транзакционных блокировок в сети нет.
+
+Контракт сохранён: lookup возвращает CompanyInput без id, черновик принимает company
+объектом. Найденная компания сохраняется в БД; уникальный ИНН и UPSERT обеспечивают
+одну identity при конкуренции. Создание/PATCH связывают company_id по ИНН и сохраняют
+отдельный снимок введённой анкеты; пользовательский ввод не переписывает справочник.
+Продукт обязан существовать и быть активным (иначе 422); product_snapshot включает
+его версию и условия. Пропуск company/product сохраняет старый снимок, null очищает
+ссылку и снимок. Изменение справочников не меняет ранее сохранённые анкеты.
+
+После входа и обновления CSRF:
+
+```bash
+curl --fail-with-body -sS -b "$auth_cookies" "$auth_origin/api/products"
+curl --fail-with-body -sS -b "$auth_cookies" \
+  "$auth_origin/api/companies/lookup?inn=0086906651"
+curl --fail-with-body -sS -b "$auth_cookies" -H "Origin: $auth_origin" \
+  -H "X-CSRF-Token: $csrf_token" -H 'Content-Type: application/json' \
+  -d '{}' "$auth_origin/api/applications"
+# Используйте id ответа (Location: /api/applications/{id}):
+application_id='UUID-из-ответа'
+curl --fail-with-body -sS -b "$auth_cookies" -X PATCH \
+  -H "Origin: $auth_origin" -H "X-CSRF-Token: $csrf_token" \
+  -H 'Content-Type: application/json' \
+  -d '{"expected_revision":1,"amount":"100000.01","purpose":"Закупка товара"}' \
+  "$auth_origin/api/applications/$application_id"
+curl --fail-with-body -sS -b "$auth_cookies" \
+  "$auth_origin/api/applications?status=DRAFT&offset=0&limit=20"
+curl --fail-with-body -sS -b "$auth_cookies" \
+  "$auth_origin/api/applications/$application_id"
+```
+
+POST допускает `{}`, назначает owner_id из сессии, DRAFT/revision=1. PATCH меняет
+только переданные поля, null очищает nullable-поле. Блокировка строки и повторное
+чтение после неё атомарно проверяют DRAFT/expected_revision; конфликт — 409 без записи,
+успех повышает revision и updated_at. Создание/редактирование и событие аудита
+фиксируются одной транзакцией. Два запроса одной ревизии из разных сессий дают
+один успех и один 409. Чужая заявка — 404; underwriter не получает клиентский CRUD.
+Список фильтруется по владельцу/статусу, total и страница читаются одним SQL-снимком,
+порядок updated_at DESC, id DESC. Карточка формирует только публичное решение и
+allowed_actions по статусу; подсказки submit/cancel пока ведут к заглушкам B06.
+Суммы проходят через Decimal/NUMERIC, время — UTC; все API-ответы имеют no-store.
 
 ## Проверки
 
@@ -199,8 +276,8 @@ issuer/audience/algorithm/claims, отзыв и подмена сессии, CSR
 
 Docker-проверка создаёт случайный отдельный Compose project, порты, пароль и секрет;
 удаляет только собственные ресурсы. Запускает миграции и двойной импорт до API,
-проверяет реальный вход/me/logout, JWT replay, сохранность сессии при рестарте,
-непривилегированный UID и health при сбое БД:
+проверяет login → продукты → компанию → создание/PATCH/чтение черновика → рестарт,
+сохранность сессии и данных, logout/JWT replay, отказ мока, UID и health при сбое БД:
 
 ```bash
 uv run --locked python ../scripts/check_docker.py
@@ -209,5 +286,9 @@ DOCKER_BUILD_CA=/path/to/combined-ca.pem uv run --locked python ../scripts/check
 ```
 
 Полный Ruff check применяется ко всему backend. В актуальном main есть существующее
-отклонение форматирования `app/decision/texts.py`, принадлежащего рискам; B04 его не
-меняет. Проверка форматирования файлов B04 выполняется отдельно от этой папки.
+отклонение форматирования `app/decision/texts.py`, принадлежащего рискам; B05 его не
+меняет. Проверка всех файлов вне этой папки:
+
+```bash
+uv run --locked ruff format --check . ../scripts --extend-exclude app/decision
+```

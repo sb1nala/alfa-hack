@@ -122,7 +122,12 @@ def test_operations_require_authentication_before_business_stubs(path, method, o
     "path,method,operation", OPERATIONS, ids=[f"{m} {p}" for p, m, _ in OPERATIONS]
 )
 def test_contract_structure_and_examples_per_operation(path, method, operation):
-    assert ("501" in operation["responses"]) == (not path.startswith("/api/auth/"))
+    implemented = (
+        path.startswith("/api/auth/")
+        or path in {"/api/products", "/api/companies/lookup", "/api/applications"}
+        or (path == "/api/applications/{application_id}" and method in {"get", "patch"})
+    )
+    assert ("501" in operation["responses"]) == (not implemented)
     assert "422" in operation["responses"]
     assert any(int(code) < 300 for code in operation["responses"])
     assert operation["operationId"]

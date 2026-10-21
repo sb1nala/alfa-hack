@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
 
+import httpx
 import jwt
 import pytest
 from fastapi.testclient import TestClient
@@ -452,7 +453,7 @@ def resources(auth_settings):
 
 
 @pytest.mark.parametrize("account", [CLIENT, SECOND, BANK], ids=["owner", "other-client", "bank"])
-def test_all_business_routes_check_access_before_501(client, account, resources):
+def test_all_business_routes_check_access(client, account, resources, monkeypatch):
     from test_contract import OPERATIONS, wire_request
 
     from app.api import examples as ex
@@ -460,6 +461,13 @@ def test_all_business_routes_check_access_before_501(client, account, resources)
     login(client, account)
     token = csrf(client)
     application, _, document, foreign_document = resources
+    monkeypatch.setattr(
+        client.app.state,
+        "registry",
+        httpx.AsyncClient(
+            base_url="http://mocks", transport=httpx.MockTransport(lambda r: httpx.Response(404))
+        ),
+    )
     for path, method, operation in OPERATIONS:
         if path.startswith("/api/auth/"):
             continue
@@ -469,6 +477,14 @@ def test_all_business_routes_check_access_before_501(client, account, resources)
         roles = operation["x-required-roles"]
         role = "underwriter" if account == BANK else "client"
         expected = 501
+        if path in {"/api/products", "/api/companies/lookup", "/api/applications"} or path == (
+            "/api/applications/{application_id}"
+        ):
+            expected = 201 if method == "post" else 200
+            if method == "post":
+                kwargs["json"] = {}
+            elif method == "patch":
+                kwargs["json"] = {"expected_revision": 1}
         if role not in roles:
             expected = 403
         elif account == SECOND and "{application_id}" in path:

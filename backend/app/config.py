@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     auth_session_hours: int = Field(default=8, ge=1, le=168)
     auth_allowed_origin: str = "https://localhost"
     auth_cookie_secure: bool = True
+    mocks_base_url: str = "http://localhost:8001"
+    egrul_timeout: float = Field(default=2.0, ge=0.1, le=10.0)
 
     def auth_secret(self) -> str:
         if self.auth_jwt_secret is None:

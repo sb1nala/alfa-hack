@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from typing import Literal
 from uuid import uuid4
 
+import httpx
 from asyncpg import PostgresError
 from fastapi import FastAPI, Request, Response, status
 from fastapi.exception_handlers import http_exception_handler
@@ -33,7 +34,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.engine = engine
         app.state.session_factory = create_session_factory(engine)
         try:
-            yield
+            async with httpx.AsyncClient(
+                base_url=config.mocks_base_url, trust_env=False, follow_redirects=False
+            ) as registry:
+                app.state.registry = registry
+                yield
         finally:
             await engine.dispose()
 
@@ -62,7 +67,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response = await call_next(request)
         if request.url.path.startswith("/api/") or request.url.path == "/api":
             response.headers["X-Request-ID"] = str(request.state.request_id)
-        if request.url.path.startswith("/api/auth/"):
+        if request.url.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
         return response
 

@@ -81,6 +81,18 @@ Runtime-зависимость и новые транзитивные завис
 | [pycparser](https://pypi.org/project/pycparser/) | 3.11 | BSD-3-Clause | Транзитивная зависимость cffi |
 | [PyJWT](https://pypi.org/project/PyJWT/) | 2.15.1 | MIT | Подпись и проверка JWT, фиксированный HS256 |
 
+## Каталог и черновики (B05)
+
+HTTPX перенесён также в runtime бэкенда для обращения только к локальному моку
+ЕГРЮЛ. Версии и хеши — `backend/uv.lock`; внешних сервисов и датасетов не добавлено.
+
+| Библиотека | Версия | Лицензия | Использование |
+| --- | --- | --- | --- |
+| [HTTPX](https://pypi.org/project/httpx/) | 0.28.1 | BSD-3-Clause | Async HTTP, таймаут запросов к моку |
+| [httpcore](https://pypi.org/project/httpcore/) | 1.0.9 | BSD-3-Clause | Транспорт HTTPX |
+| [h11](https://pypi.org/project/h11/) | 0.16.0 | MIT | HTTP/1.1 для httpcore |
+| [certifi](https://pypi.org/project/certifi/) | 2026.10.19 | MPL-2.0 | Корневые CA для HTTPX/httpcore |
+
 ## Каркас фронтенда (#11)
 
 Прямые зависимости перечислены ниже; точные версии транзитивных зависимостей

@@ -32,6 +32,8 @@ def main() -> None:
     env["POSTGRES_DB"] = "alfa_hack"
     env["POSTGRES_USER"] = "alfa_hack"
     env["POSTGRES_PASSWORD"] = uuid4().hex
+    env["MOCKS_PORT"] = str(free_port())
+    env["MOCKS_LATENCY_MS"] = "0"
     env["DB_READINESS_TIMEOUT"] = "2"
     env["AUTH_JWT_SECRET"] = secrets.token_urlsafe(48)
     env["AUTH_ALLOWED_ORIGIN"] = f"http://127.0.0.1:{env['BACKEND_PORT']}"
@@ -40,7 +42,7 @@ def main() -> None:
         "docker",
         "compose",
         "--project-name",
-        f"alfa-b04-check-{uuid4().hex[:10]}",
+        f"alfa-b05-check-{uuid4().hex[:10]}",
         "--env-file",
         str(ROOT / ".env.example"),
         "-f",
@@ -79,7 +81,7 @@ def main() -> None:
                     raise
                 time.sleep(0.5)
 
-    def auth_request(path, expected, *, body=None, token=None, cookie=None):
+    def api_request(path, expected, *, body=None, token=None, cookie=None, method=None):
         request_headers = {"Origin": env["AUTH_ALLOWED_ORIGIN"]}
         if token:
             request_headers["X-CSRF-Token"] = token
@@ -90,9 +92,10 @@ def main() -> None:
             request_headers["Content-Type"] = "application/json"
             data = json.dumps(body).encode()
         request = Request(
-            env["AUTH_ALLOWED_ORIGIN"] + "/api/auth/" + path,
+            env["AUTH_ALLOWED_ORIGIN"] + "/api/" + path,
             data=data,
             headers=request_headers,
+            method=method,
         )
         try:
             response = opener.open(request, timeout=6)
@@ -103,36 +106,46 @@ def main() -> None:
             assert response.headers["Cache-Control"] == "no-store"
             raw = response.read()
             result = json.loads(raw) if raw else None
-            if path == "login" and expected == 200:
+            if path == "auth/login" and expected == 200:
                 assert set(result) == {"id", "login", "display_name", "role"}
                 assert all(
                     "HttpOnly" in value and "SameSite=lax" in value and "Path=/" in value
                     for value in response.headers.get_all("Set-Cookie")
                 )
-            if path == "logout" and expected == 204:
+            if path == "auth/logout" and expected == 204:
                 assert not raw and not list(cookies)
             return result
 
+    def auth_request(path, expected, **kwargs):
+        return api_request("auth/" + path, expected, **kwargs)
+
     with tempfile.TemporaryDirectory(prefix="alfa-docker-check-") as temporary:
         # Cloud checkouts may expose files as mode 0600 owned by the executor user.
-        # Stage synthetic accounts for UID 10001 without changing the owner's seed/ file.
+        # Stage synthetic inputs for UID 10001 without changing the owners' files.
         staging = Path(temporary)
         staging.chmod(0o755)
-        staged_accounts = staging / "accounts.json"
-        shutil.copyfile(ROOT / "seed/accounts.json", staged_accounts)
-        staged_accounts.chmod(0o444)
-        override_data = {
-            "services": {"backend": {"volumes": [f"{staged_accounts}:/seed/accounts.json:ro"]}}
-        }
+        mounts = []
+        for source, target in (
+            ("seed/accounts.json", "accounts.json"),
+            ("seed/companies.json", "companies.json"),
+            ("seed/products.json", "products.json"),
+            ("docs/product/ui-texts.ru.json", "product-texts.json"),
+        ):
+            staged = staging / target
+            shutil.copyfile(ROOT / source, staged)
+            staged.chmod(0o444)
+            mounts.append(f"{staged}:/seed/{target}:ro")
+        override_data = {"services": {"backend": {"volumes": mounts}, "mocks": {}}}
         # Optional corporate/proxy CA; never copied into the image.
         if ca_file := env.get("DOCKER_BUILD_CA"):
             override_data["services"]["backend"]["build"] = {"secrets": ["proxy_ca"]}
+            override_data["services"]["mocks"]["build"] = {"secrets": ["proxy_ca"]}
             override_data["secrets"] = {"proxy_ca": {"file": str(Path(ca_file).resolve())}}
         override = staging / "check-override.json"
         override.write_text(json.dumps(override_data))
         compose.extend(["-f", str(override)])
         try:
-            run("build", "backend")
+            run("build", "backend", "mocks")
             run("up", "-d", "--wait", "db")
             run("run", "--rm", "backend", "alembic", "upgrade", "head")
             run("run", "--rm", "backend", "alembic", "check")
@@ -146,8 +159,14 @@ def main() -> None:
                     "app.seed",
                     "--accounts",
                     "/seed/accounts.json",
+                    "--companies",
+                    "/seed/companies.json",
+                    "--products",
+                    "/seed/products.json",
+                    "--product-texts",
+                    "/seed/product-texts.json",
                 )
-            run("up", "-d", "--wait", "--wait-timeout", "90", "backend")
+            run("up", "-d", "--wait", "--wait-timeout", "90", "backend", "mocks")
             run(
                 "exec",
                 "-T",
@@ -184,6 +203,38 @@ def main() -> None:
             token = auth_request("csrf", 200)["csrf_token"]
             assert auth_request("me", 200) == user
 
+            products = api_request("products", 200)["items"]
+            assert len(products) == 4
+            company_data = json.loads((ROOT / "seed/companies.json").read_text())["companies"][0]
+            inn = company_data["company"]["inn"]
+            company = api_request(f"companies/lookup?inn={inn}", 200)["company"]
+            assert company == company_data["company"]
+            assert api_request("companies/lookup?inn=0000000000", 200) == {"company": None}
+            draft = api_request("applications", 201, body={}, token=token)
+            path = "applications/" + draft["id"]
+            assert draft["revision"] == 1 and draft["status"] == "DRAFT"
+            edited = api_request(
+                path,
+                200,
+                method="PATCH",
+                token=token,
+                body={
+                    "expected_revision": 1,
+                    "company": company,
+                    "product_id": products[0]["id"],
+                    "amount": "100000.01",
+                    "purpose": "Пополнение оборотных средств",
+                },
+            )
+            assert edited["revision"] == 2 and edited["form"]["amount"] == "100000.01"
+            assert api_request(path, 200) == edited
+            assert api_request("applications?offset=0&limit=1&status=DRAFT", 200)["total"] == 1
+            api_request(path, 409, method="PATCH", token=token, body={"expected_revision": 1})
+            run("stop", "mocks")
+            api_request(f"companies/lookup?inn={inn}", 500)
+            assert api_request(path, 200) == edited
+            run("start", "mocks")
+
             print("Checking query timeout while PostgreSQL is paused", flush=True)
             run("pause", "db")
             try:
@@ -215,12 +266,13 @@ def main() -> None:
             wait_ready()
             assert auth_request("me", 200) == user
             assert auth_request("csrf", 200)["csrf_token"] == token
+            assert api_request(path, 200) == edited
             auth_request("logout", 204, body={}, token=token)
             auth_request("me", 401, cookie="access_token=" + saved_jwt)
             cookies.clear()
             auth_request("csrf", 200)
             print(
-                "PASS Docker migrations, seed, auth, restart, logout/replay and outage recovery",
+                "PASS Docker login, products, registry, drafts, restart, seed and outage recovery",
                 flush=True,
             )
         except BaseException:
