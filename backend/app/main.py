@@ -27,6 +27,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         config = settings if settings is not None else Settings()
+        config.validate_auth_runtime()
         engine = create_engine(config)
         app.state.settings = config
         app.state.engine = engine
@@ -61,6 +62,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response = await call_next(request)
         if request.url.path.startswith("/api/") or request.url.path == "/api":
             response.headers["X-Request-ID"] = str(request.state.request_id)
+        if request.url.path.startswith("/api/auth/"):
+            response.headers["Cache-Control"] = "no-store"
         return response
 
     app.add_exception_handler(RequestValidationError, validation_error)

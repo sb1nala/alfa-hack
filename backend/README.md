@@ -1,8 +1,41 @@
 # Backend
 
 Python 3.12, FastAPI, async SQLAlchemy 2/asyncpg, PostgreSQL 16, Alembic, uv.
-B03 добавляет только схему хранения; бизнес-маршруты продолжают возвращать `501`.
-Следующий этап — B04 (авторизация). Контракт: `../docs/openapi.yaml`.
+B04 реализует `GET /api/auth/csrf`, `POST /api/auth/login`, `GET /api/auth/me`,
+`POST /api/auth/logout`, JWT-сессии, CSRF, роли и зависимости доступа к ресурсам.
+Остальные бизнес-операции после проверки доступа возвращают `501`; CRUD, фильтрация
+списков, хранение файлов и SSE ещё не реализованы. Следующий этап — B05.
+Контракт: `../docs/openapi.yaml`.
+
+## Настройки авторизации
+
+Создайте `.env` по `.env.example` и задайте собственные `POSTGRES_PASSWORD` и
+`AUTH_JWT_SECRET`. У секрета нет встроенного значения; runtime API без него не
+запускается. Сгенерировать криптографически случайное значение:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+- `AUTH_JWT_SECRET`: минимум 32 символа, для развёртывания используйте результат
+  генерации выше. Храните вне Git/логов; смена секрета инвалидирует все JWT и CSRF.
+- `AUTH_JWT_ISSUER=alfa-hack`, `AUTH_JWT_AUDIENCE=alfa-hack-web`:
+  проверяются вместе с подписью HS256, обязательными claims, временем и состоянием БД.
+- `AUTH_SESSION_HOURS=8`: срок сессии без refresh, настраивается от 1 до 168 часов.
+- `AUTH_ALLOWED_ORIGIN`: точный origin фронтенда/API, с портом, без пути и `/` в конце.
+  Например, `http://localhost:8000` для прямого локального API либо origin фронтенда
+  с его `/api` прокси. Во всех мутациях Origin обязателен; Host и X-Forwarded-* не
+  используются для его определения. Другой порт, поддомен или отсутствующий Origin — 403.
+- `AUTH_COOKIE_SECURE=true` для HTTPS. Для локального HTTP явно задайте `false`
+  (как в `.env.example`); несогласованная пара origin/Secure блокирует запуск API.
+  `access_token` и `csrf_context`: HttpOnly, SameSite=Lax, Path=/, без Domain.
+
+JWT содержит sub, role, sid, iat, exp, iss, aud. Сервер на каждом защищённом запросе
+проверяет также пользователя, текущую роль, срок и отзыв сессии в PostgreSQL.
+Токен и password_hash никогда не входят в JSON. Logout отзывает сессию в БД, поэтому
+скопированный JWT тоже перестаёт работать. Стабильные настройки и та же БД сохраняют
+сессии после рестарта. Регистрации, refresh, восстановления пароля и OAuth нет.
+Все auth-ответы, включая ошибки, имеют `Cache-Control: no-store`.
 
 ## Миграции
 
@@ -13,7 +46,8 @@ docker compose up -d --wait db
 docker compose build backend
 docker compose run --rm backend alembic upgrade head
 docker compose run --rm backend alembic check
-docker compose up -d backend
+docker compose run --rm backend python -m app.seed --accounts /seed/accounts.json
+docker compose up -d --wait backend
 ```
 
 Образ содержит Alembic и миграции, работает от пользователя `app` (UID 10001).
@@ -45,6 +79,70 @@ Compose — `db:5432`. URL собирается через SQLAlchemy `URL.creat
 всех таблиц и снимаются первыми при откате. FK не удаляют историю каскадно.
 Сервисные инварианты следующих этапов описаны в `../docs/data-model.md`.
 
+## Импорт аккаунтов и проверка входа
+
+Импорт запускается явно и атомарно, только для аккаунтов из `seed/accounts.json`:
+`clients` → client, `underwriters` → underwriter (9 + 1). Compose монтирует этот файл
+в `/seed/accounts.json` read-only; build context остаётся `backend/`, Dockerfile не
+копирует файлы из соседних каталогов. Файл должен быть читаем UID 10001 контейнера
+(обычный Git checkout даёт 0644). В средах с исходным режимом 0600 используйте
+временную читаемую копию и локальный Compose override mount, сохраняя оригинал.
+Повторный импорт сохраняет UUID, имя, роль и
+существующий хеш/пароль. Конфликт роли откатывает весь импорт с безопасной ошибкой.
+Отчёт содержит только количества; пароли не печатаются. `company_inn` игнорируется:
+это контекст демо, права определяются `applications.owner_id`, связи user → company нет.
+Компании, продукты и сценарии этим импортом не загружаются.
+
+```bash
+# Из корня, после миграций:
+docker compose run --rm backend python -m app.seed --accounts /seed/accounts.json
+# Повтор: created=0, unchanged=10
+# Локально из backend/:
+uv run --locked --env-file ../.env python -m app.seed --accounts ../seed/accounts.json
+```
+
+Локальный curl-путь (Python нужен только для чтения JSON; JWT/CSRF не печатаются):
+
+```bash
+auth_origin=http://localhost:8000  # должен совпадать с AUTH_ALLOWED_ORIGIN
+auth_cookies=$(mktemp)
+chmod 600 "$auth_cookies"
+csrf_token=$(curl --fail-with-body -sS -c "$auth_cookies" -b "$auth_cookies" \
+  "$auth_origin/api/auth/csrf" | python -c 'import json,sys; print(json.load(sys.stdin)["csrf_token"])')
+curl --fail-with-body -sS -c "$auth_cookies" -b "$auth_cookies" \
+  -H "Origin: $auth_origin" -H "X-CSRF-Token: $csrf_token" -H 'Content-Type: application/json' \
+  -d '{"login":"demo-approve","password":"demo-2026"}' "$auth_origin/api/auth/login"
+# Старый CSRF после входа недействителен:
+csrf_token=$(curl --fail-with-body -sS -c "$auth_cookies" -b "$auth_cookies" \
+  "$auth_origin/api/auth/csrf" | python -c 'import json,sys; print(json.load(sys.stdin)["csrf_token"])')
+curl --fail-with-body -sS -b "$auth_cookies" "$auth_origin/api/auth/me"
+curl --fail-with-body -sS -c "$auth_cookies" -b "$auth_cookies" -X POST \
+  -H "Origin: $auth_origin" -H "X-CSRF-Token: $csrf_token" "$auth_origin/api/auth/logout"
+# Успех logout: 204, пустое тело. Следующий /me: 401.
+rm "$auth_cookies"
+unset csrf_token
+```
+
+Для банковской роли используйте `analyst`; локальные демонстрационные пароли —
+в `docs/test-data.md`. Не публикуйте cookie jar, не используйте `curl -v` в общих логах.
+
+Фронтенд: GET csrf → сохранить токен в памяти → POST login с X-CSRF-Token →
+GET csrf заново → GET me → бизнес-запросы (все мутации с X-CSRF-Token) →
+POST logout → очистить токен в памяти. Следующий GET csrf создаст анонимный контекст.
+Повторный GET csrf действующего контекста возвращает тот же токен, сохраняя работу
+других вкладок. При смене входа/выходе в другой вкладке перечитайте me и csrf.
+Браузер сам отправляет Origin и cookies при same-origin запросах; EventSource для
+GET не требует CSRF. JWT не читается JavaScript и не хранится в localStorage.
+
+Переиспользуемые зависимости находятся в `app/dependencies.py`: текущие пользователь
+и сессия, роль, CSRF/Origin, загрузка заявки с проверкой owner_id или доступа
+underwriter, принадлежность документа заявке. Без сессии — 401, роль/CSRF/Origin —
+403, чужая/отсутствующая заявка или документ — 404. Подмена document_id из другой
+заявки не проходит даже при доступе к заявке из URL. Банковские операции доступны
+только underwriter; клиентские команды изменения заявки ему запрещены.
+Разрешённые операции пока доходят до 501. Реальная фильтрация списка, создание и
+редактирование заявок, бизнес-переходы, аудит, файлы и поток SSE идут далее.
+
 ## Проверки
 
 Из `backend/`:
@@ -68,10 +166,12 @@ uv run --locked --env-file ../.env pytest -q --run-postgres
 
 Если db этого проекта конфликтует по порту с уже работающей БД, задайте свободный
 `POSTGRES_PORT` в отдельном env-файле и передайте тот же файл обеим командам.
-Флаг `--run-postgres` включает 59 интеграционных проверок вместе с обычными тестами.
+Флаг `--run-postgres` включает интеграционные проверки моделей, авторизации и импорта.
 Фикстура подключается к указанной административной БД, проверяет версию, создаёт
 случайную `b03_test_<uuid>` через `TEMPLATE template0`, выполняет
-`upgrade head → upgrade head → check → downgrade base → upgrade head → check`.
+`upgrade b03_initial → запись тестовой строки → upgrade head → проверка сохранности →
+downgrade b03_initial → проверка сохранности → upgrade head → upgrade head → check →
+downgrade base → upgrade head → check`.
 После downgrade проверяется отсутствие бизнес-таблиц. После тестов удаляется только
 созданная фикстурой БД. Проверки охватывают частичный черновик, commit/read, Decimal,
 UTC, DATE/JSONB, UNIQUE/CHECK/NOT NULL/FK, чужие решения/предложения и защиту истории.
@@ -86,3 +186,23 @@ uv run --locked --env-file ../.env.test alembic upgrade head
 
 `.env.test` должен указывать на эту одноразовую БД. Не запускайте downgrade на БД
 разработчиков. Удаление существующих volumes для проверки не требуется.
+
+Авторизация проверяется настоящими HTTP-запросами TestClient к приложению с реальной
+PostgreSQL: обе роли, полный вход/выход, рестарт приложения, истечение/подделка JWT,
+issuer/audience/algorithm/claims, отзыв и подмена сессии, CSRF и точный Origin,
+ротация, cookies, владелец/другой клиент/банк на всех бизнес-маршрутах, подмена документа.
+
+Docker-проверка создаёт случайный отдельный Compose project, порты, пароль и секрет;
+удаляет только собственные ресурсы. Запускает миграции и двойной импорт до API,
+проверяет реальный вход/me/logout, JWT replay, сохранность сессии при рестарте,
+непривилегированный UID и health при сбое БД:
+
+```bash
+uv run --locked python ../scripts/check_docker.py
+# При HTTPS inspection proxy передайте CA только BuildKit secret:
+DOCKER_BUILD_CA=/path/to/combined-ca.pem uv run --locked python ../scripts/check_docker.py
+```
+
+Полный Ruff check применяется ко всему backend. В актуальном main есть существующее
+отклонение форматирования `app/decision/texts.py`, принадлежащего рискам; B04 его не
+меняет. Проверка форматирования файлов B04 выполняется отдельно от этой папки.

@@ -67,3 +67,16 @@ Runtime-зависимость и новые транзитивные завис
 | [pytest](https://pypi.org/project/pytest/) | 9.1.1 | MIT | Dev: тесты |
 
 Данные моков синтетические (`seed/companies.json`): ИНН с несуществующим кодом региона `00`, названия и люди вымышлены.
+
+
+## Авторизация (B04)
+
+Версии и хеши зафиксированы в `backend/uv.lock`; все библиотеки бесплатные.
+
+| Библиотека | Версия | Лицензия | Использование |
+| --- | --- | --- | --- |
+| [argon2-cffi](https://pypi.org/project/argon2-cffi/) | 25.1.0 | MIT | Argon2id для хеширования и проверки паролей |
+| [argon2-cffi-bindings](https://pypi.org/project/argon2-cffi-bindings/) | 26.1.0 | MIT (включённый Argon2: Apache-2.0 / CC0) | Поддерживаемые bindings к реализации Argon2 |
+| [cffi](https://pypi.org/project/cffi/) | 2.1.1 | MIT | Транзитивная зависимость bindings |
+| [pycparser](https://pypi.org/project/pycparser/) | 3.11 | BSD-3-Clause | Транзитивная зависимость cffi |
+| [PyJWT](https://pypi.org/project/PyJWT/) | 2.15.1 | MIT | Подпись и проверка JWT, фиксированный HS256 |

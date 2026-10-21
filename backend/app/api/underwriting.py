@@ -5,6 +5,7 @@ from fastapi import APIRouter, Body, Depends
 from app.api import examples as ex
 from app.api.applications import ApplicationID
 from app.api.contract import endpoint, not_implemented
+from app.dependencies import accessible_application
 from app.schemas.common import ApplicationStatus, Page, PageQuery
 from app.schemas.underwriting import (
     ManualDecisionRequest,
@@ -40,6 +41,7 @@ async def queue(
         "Банковская карточка: клиентские данные + история решений с внутренними факторами "
         "и аналитическим объяснением. Никогда не использовать её схему в клиентском API.",
         role="underwriter",
+        access=accessible_application,
     ),
 )
 async def bank_card(application_id: ApplicationID) -> UnderwriterApplication:
@@ -83,6 +85,7 @@ async def bank_card(application_id: ApplicationID) -> UnderwriterApplication:
         "expected_revision обязателен. Решение добавляется в историю, старое не перезаписывается. "
         "explanation — клиенту, analytical_explanation — только банку.",
         role="underwriter",
+        access=accessible_application,
         mutation=True,
     ),
 )

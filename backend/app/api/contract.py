@@ -1,13 +1,15 @@
-"""OpenAPI metadata is declarative: no JWT, role or CSRF checks are performed."""
+"""Published metadata and shared access dependencies for API operations."""
 
+from collections.abc import Callable
 from typing import NoReturn
 
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.examples import examples
+from app.dependencies import require_csrf, require_role
 from app.schemas.common import ErrorResponse
 
 ERRORS = {
@@ -25,20 +27,22 @@ ERRORS = {
     501: ("NOT_IMPLEMENTED", "Контракт определён; бизнес-операция пока не реализована"),
 }
 DESCRIPTION = """
-API v1 — контракт и типизированные заглушки. **Все валидные бизнес-запросы возвращают
-501**, примеры успешных ответов предназначены для генерации типов и Prism.
-JWT, роли, владение ресурсами и CSRF **только описаны**, проверки пока не реализованы.
-Заглушки не создают данные, не устанавливают cookies и не выполняют интеграции.
+API v1: авторизация JWT, роли, владение ресурсами, Origin и CSRF реализованы.
+Остальные бизнес-операции остаются типизированными заглушками: после проверок доступа
+валидный запрос возвращает 501. Примеры бизнес-успехов предназначены для генерации
+типов и Prism. Заглушки не создают бизнес-данные и не выполняют интеграции.
 
-Будущая авторизация: один origin для фронтенда и API. JWT только в cookie
-`access_token` (HttpOnly; Secure в HTTPS; SameSite=Lax; Path=/), никогда в JSON или
-localStorage. `GET /api/auth/csrf` доступен до входа: создаёт анонимный контекст
-`csrf_context` в HttpOnly cookie с теми же атрибутами и возвращает `csrf_token`.
-Клиент хранит CSRF-токен в памяти и передаёт `X-CSRF-Token` во **всех** изменяющих
-запросах, включая login/logout. Сервер должен связать токен с контекстом/сессией,
-проверять Origin и ротировать контекст и токен при входе/выходе. После входа/выхода
-нужно снова получить CSRF-токен. GET не меняет бизнес-данные. Чужой ресурс — 404,
-неверная роль или CSRF — 403, отсутствующая/просроченная сессия — 401.
+Один настроенный origin для фронтенда и API. JWT только в cookie `access_token`
+(HttpOnly; Secure в HTTPS; SameSite=Lax; Path=/), никогда в JSON или localStorage.
+GET /api/auth/csrf доступен до входа: создаёт анонимный контекст `csrf_context`
+в HttpOnly cookie с теми же атрибутами и возвращает csrf_token. Клиент хранит токен
+в памяти и передаёт X-CSRF-Token во всех изменяющих запросах, включая login/logout.
+Origin обязателен и должен точно совпадать с AUTH_ALLOWED_ORIGIN. Токен связан с
+серверным контекстом и сессией. При входе/выходе контекст ротируется, затем клиент
+снова вызывает GET /api/auth/csrf; повторный GET сохраняет действующий токен.
+Logout отзывает сессию в PostgreSQL, в том числе для скопированного JWT.
+Auth-ответы имеют Cache-Control: no-store. Чужой ресурс — 404, неверная роль/CSRF
+или Origin — 403, отсутствующая/просроченная/отозванная сессия — 401.
 
 UUID для идентификаторов, ISO 8601 UTC для времени, суммы — десятичные строки
 рублей с двумя знаками, сроки — целые месяцы. `revision` начинается с 1;
@@ -49,14 +53,10 @@ UUID для идентификаторов, ISO 8601 UTC для времени, 
 `X-Request-ID` ответа соответствует UUID в ошибке; секреты и входные значения
 в ошибках не возвращаются. Клиент ориентируется на code, не на текст message.
 
-Статусы/переходы — docs/application-states.md. Обнаружена неоднозначность: текст
-разрешает CANCELLED «из любого статуса до SIGNED», диаграмма явно показывает лишь
-COUNTER_OFFER → CANCELLED и объявляет REJECTED терминальным. Рекомендация для
-следующего этапа: разрешить cancel из активных DRAFT, SUBMITTED, CHECKING, SCORING,
-NEEDS_INFO, MANUAL_REVIEW, APPROVED, COUNTER_OFFER, OFFER_ACCEPTED, запретить из
-REJECTED, SIGNED, ISSUED, CANCELLED; согласовать уточнение документа. Эти переходы
-здесь не реализованы. `allowed_actions` — подсказка интерфейсу, сервер на следующем
-этапе обязан повторно проверять права, статус и ревизию.
+Статусы/переходы — docs/application-states.md. Отмена разрешена из активных
+состояний до SIGNED, исключая конечные REJECTED, ISSUED, CANCELLED. Бизнес-переходы
+здесь не реализованы. allowed_actions — подсказка интерфейсу; будущий сервис обязан
+проверять права, статус и ревизию при выполнении операции.
 
 Все примеры синтетические. Ставки, пороги скоринга и кредитная политика не заданы.
 Набор полей v1 — предложение этого PR, кроме явно согласованных решений задачи.
@@ -93,8 +93,12 @@ def endpoint(
     status_code: int = 200,
     extra_errors: tuple[int, ...] = (),
     headers: dict | None = None,
+    implemented: bool = False,
+    access: Callable | None = None,
 ) -> dict:
     statuses = {400, 422, 429, 500, 501, *extra_errors}
+    if implemented:
+        statuses.discard(501)
     if role:
         statuses.update({401, 403, 404})
     if mutation:
@@ -108,20 +112,39 @@ def endpoint(
         }
         for code in sorted(statuses)
     }
-    responses[status_code] = {"description": "Будущий успешный ответ (пока возвращается 501)"}
+    responses[status_code] = {
+        "description": "Успешный ответ"
+        if implemented
+        else "Будущий успешный ответ (после проверок доступа пока 501)"
+    }
     if model:
         responses[status_code]["content"] = {"application/json": {"examples": examples(values)}}
     if headers:
-        responses[status_code]["headers"] = headers
+        responses[status_code]["headers"] = headers.copy()
+    if implemented:
+        for response in responses.values():
+            response.setdefault("headers", {})["Cache-Control"] = {
+                "schema": {"type": "string", "const": "no-store"}
+            }
     security = {}
     if role:
         security["SessionCookie"] = []
     if mutation:
         security["CSRFToken"] = []
+    dependencies = []
+    if role:
+        roles = ("client", "underwriter") if role == "both" else (role,)
+        dependencies.append(Depends(require_role(*roles)))
+    if mutation:
+        dependencies.append(Depends(require_csrf))
+    if access:
+        dependencies.append(Depends(access))
     return {
+        "dependencies": dependencies,
         "response_model": model,
         "status_code": status_code,
-        "description": description + "\n\nЗаглушка: 501. JWT/роли/CSRF пока только в контракте.",
+        "description": description
+        + ("" if implemented else "\n\nБизнес-заглушка: 501 после проверок доступа."),
         "responses": responses,
         "openapi_extra": {
             "security": [security] if security else [],
@@ -147,7 +170,10 @@ def error_response(request: Request, status: int, fields: list | None = None) ->
             "field_errors": fields or [],
             "request_id": request_id,
         },
-        headers={"X-Request-ID": request_id},
+        headers={
+            "X-Request-ID": request_id,
+            **({"Cache-Control": "no-store"} if request.url.path.startswith("/api/auth/") else {}),
+        },
     )
 
 

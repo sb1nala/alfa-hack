@@ -1605,39 +1605,43 @@ components:
       name: X-CSRF-Token
       type: apiKey
     SessionCookie:
-      description: JWT в HttpOnly cookie; только контракт, проверки пока отсутствуют.
+      description: JWT в HttpOnly cookie; сервер проверяет подпись HS256 и сессию.
       in: cookie
       name: access_token
       type: apiKey
 info:
   description: '
 
-    API v1 — контракт и типизированные заглушки. **Все валидные бизнес-запросы возвращают
+    API v1: авторизация JWT, роли, владение ресурсами, Origin и CSRF реализованы.
 
-    501**, примеры успешных ответов предназначены для генерации типов и Prism.
+    Остальные бизнес-операции остаются типизированными заглушками: после проверок доступа
 
-    JWT, роли, владение ресурсами и CSRF **только описаны**, проверки пока не реализованы.
+    валидный запрос возвращает 501. Примеры бизнес-успехов предназначены для генерации
 
-    Заглушки не создают данные, не устанавливают cookies и не выполняют интеграции.
+    типов и Prism. Заглушки не создают бизнес-данные и не выполняют интеграции.
 
 
-    Будущая авторизация: один origin для фронтенда и API. JWT только в cookie
+    Один настроенный origin для фронтенда и API. JWT только в cookie `access_token`
 
-    `access_token` (HttpOnly; Secure в HTTPS; SameSite=Lax; Path=/), никогда в JSON или
+    (HttpOnly; Secure в HTTPS; SameSite=Lax; Path=/), никогда в JSON или localStorage.
 
-    localStorage. `GET /api/auth/csrf` доступен до входа: создаёт анонимный контекст
+    GET /api/auth/csrf доступен до входа: создаёт анонимный контекст `csrf_context`
 
-    `csrf_context` в HttpOnly cookie с теми же атрибутами и возвращает `csrf_token`.
+    в HttpOnly cookie с теми же атрибутами и возвращает csrf_token. Клиент хранит токен
 
-    Клиент хранит CSRF-токен в памяти и передаёт `X-CSRF-Token` во **всех** изменяющих
+    в памяти и передаёт X-CSRF-Token во всех изменяющих запросах, включая login/logout.
 
-    запросах, включая login/logout. Сервер должен связать токен с контекстом/сессией,
+    Origin обязателен и должен точно совпадать с AUTH_ALLOWED_ORIGIN. Токен связан с
 
-    проверять Origin и ротировать контекст и токен при входе/выходе. После входа/выхода
+    серверным контекстом и сессией. При входе/выходе контекст ротируется, затем клиент
 
-    нужно снова получить CSRF-токен. GET не меняет бизнес-данные. Чужой ресурс — 404,
+    снова вызывает GET /api/auth/csrf; повторный GET сохраняет действующий токен.
 
-    неверная роль или CSRF — 403, отсутствующая/просроченная сессия — 401.
+    Logout отзывает сессию в PostgreSQL, в том числе для скопированного JWT.
+
+    Auth-ответы имеют Cache-Control: no-store. Чужой ресурс — 404, неверная роль/CSRF
+
+    или Origin — 403, отсутствующая/просроченная/отозванная сессия — 401.
 
 
     UUID для идентификаторов, ISO 8601 UTC для времени, суммы — десятичные строки
@@ -1657,21 +1661,13 @@ info:
     в ошибках не возвращаются. Клиент ориентируется на code, не на текст message.
 
 
-    Статусы/переходы — docs/application-states.md. Обнаружена неоднозначность: текст
+    Статусы/переходы — docs/application-states.md. Отмена разрешена из активных
 
-    разрешает CANCELLED «из любого статуса до SIGNED», диаграмма явно показывает лишь
+    состояний до SIGNED, исключая конечные REJECTED, ISSUED, CANCELLED. Бизнес-переходы
 
-    COUNTER_OFFER → CANCELLED и объявляет REJECTED терминальным. Рекомендация для
+    здесь не реализованы. allowed_actions — подсказка интерфейсу; будущий сервис обязан
 
-    следующего этапа: разрешить cancel из активных DRAFT, SUBMITTED, CHECKING, SCORING,
-
-    NEEDS_INFO, MANUAL_REVIEW, APPROVED, COUNTER_OFFER, OFFER_ACCEPTED, запретить из
-
-    REJECTED, SIGNED, ISSUED, CANCELLED; согласовать уточнение документа. Эти переходы
-
-    здесь не реализованы. `allowed_actions` — подсказка интерфейсу, сервер на следующем
-
-    этапе обязан повторно проверять права, статус и ревизию.
+    проверять права, статус и ревизию при выполнении операции.
 
 
     Все примеры синтетические. Ставки, пороги скоринга и кредитная политика не заданы.
@@ -1689,7 +1685,7 @@ paths:
         — пагинация; status — необязательный фильтр.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: list_applications_api_applications_get
       parameters:
       - in: query
@@ -1745,7 +1741,7 @@ paths:
                     total: 1
               schema:
                 $ref: '#/components/schemas/Page_ClientApplicationSummary_'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
         '400':
           content:
             application/json:
@@ -1913,7 +1909,7 @@ paths:
         анкеты можно заполнить позднее; {} — допустимый черновик.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: create_draft_api_applications_post
       requestBody:
         content:
@@ -1971,7 +1967,7 @@ paths:
                     updated_at: '2026-10-20T18:00:00Z'
               schema:
                 $ref: '#/components/schemas/ClientApplication'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
           headers:
             Location:
               description: /api/applications/{id}
@@ -2165,7 +2161,7 @@ paths:
         Банковские факторы и аналитическое объяснение никогда не возвращаются.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: get_application_api_applications__application_id__get
       parameters:
       - in: path
@@ -2352,7 +2348,7 @@ paths:
                     updated_at: '2026-10-20T18:00:00Z'
               schema:
                 $ref: '#/components/schemas/ClientApplication'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
         '400':
           content:
             application/json:
@@ -2520,7 +2516,7 @@ paths:
         поле. Требуется expected_revision; неверный статус или ревизия — 409.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: edit_application_api_applications__application_id__patch
       parameters:
       - in: path
@@ -2581,7 +2577,7 @@ paths:
                     updated_at: '2026-10-20T18:00:00Z'
               schema:
                 $ref: '#/components/schemas/ClientApplication'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
         '400':
           content:
             application/json:
@@ -2770,7 +2766,7 @@ paths:
         обязателен; чужое/устаревшее предложение или неверный статус — 409.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: accept_offer_api_applications__application_id__accept_offer_post
       parameters:
       - in: path
@@ -2846,7 +2842,7 @@ paths:
                     updated_at: '2026-10-20T18:00:00Z'
               schema:
                 $ref: '#/components/schemas/ClientApplication'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
         '400':
           content:
             application/json:
@@ -3036,7 +3032,7 @@ paths:
         сохраняется до появления нового.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: additional_info_api_applications__application_id__additional_info_post
       parameters:
       - in: path
@@ -3107,7 +3103,7 @@ paths:
                     updated_at: '2026-10-20T18:00:00Z'
               schema:
                 $ref: '#/components/schemas/ClientApplication'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
         '400':
           content:
             application/json:
@@ -3292,11 +3288,11 @@ paths:
       - client
   /api/applications/{application_id}/cancel:
     post:
-      description: 'Отмена заявки → CANCELLED. Требуется expected_revision. Неоднозначность отмены в документе
-        статусов и рекомендуемый список состояний описаны в общем описании API; согласовать до реализации.
+      description: 'Отмена активной заявки до SIGNED → CANCELLED согласно docs/application-states.md.
+        Требуется expected_revision; переход реализуется в B06.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: cancel_application_api_applications__application_id__cancel_post
       parameters:
       - in: path
@@ -3352,7 +3348,7 @@ paths:
                     updated_at: '2026-10-20T18:00:00Z'
               schema:
                 $ref: '#/components/schemas/ClientApplication'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
         '400':
           content:
             application/json:
@@ -3540,7 +3536,7 @@ paths:
       description: 'Метаданные документов заявки: владелец client или underwriter. Пути хранилища не раскрываются.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: list_documents_api_applications__application_id__documents_get
       parameters:
       - in: path
@@ -3571,7 +3567,7 @@ paths:
                       uploaded_by: 20000000-0000-4000-8000-000000000001
               schema:
                 $ref: '#/components/schemas/DocumentList'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
         '400':
           content:
             application/json:
@@ -3742,7 +3738,7 @@ paths:
         заявки; перечитать карточку перед следующей мутацией.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: upload_document_api_applications__application_id__documents_post
       parameters:
       - in: path
@@ -3785,7 +3781,7 @@ paths:
                     uploaded_by: 20000000-0000-4000-8000-000000000001
               schema:
                 $ref: '#/components/schemas/Document'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
         '400':
           content:
             application/json:
@@ -4012,7 +4008,7 @@ paths:
         бинарное тело; Content-Disposition содержит безопасное имя файла.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: download_document_api_applications__application_id__documents__document_id__download_get
       parameters:
       - in: path
@@ -4044,7 +4040,7 @@ paths:
               schema:
                 format: binary
                 type: string
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
           headers:
             Content-Disposition:
               description: attachment; filename=demo.txt
@@ -4263,7 +4259,7 @@ paths:
 
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: events_api_applications__application_id__events_get
       parameters:
       - in: path
@@ -4389,7 +4385,7 @@ paths:
                     id: 70000000-0000-4000-8000-000000000001
               x-event-schema:
                 $ref: '#/components/schemas/SSEEvent'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
           headers:
             Cache-Control:
               schema:
@@ -4588,7 +4584,7 @@ paths:
         авторы банковских решений и сырые ответы моков исключены.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: history_api_applications__application_id__history_get
       parameters:
       - in: path
@@ -4638,7 +4634,7 @@ paths:
                     next_cursor: null
               schema:
                 $ref: '#/components/schemas/EventList'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
         '400':
           content:
             application/json:
@@ -4827,7 +4823,7 @@ paths:
         Выдача SIGNED → ISSUED — будущая системная операция, отдельный клиентский endpoint не нужен.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: sign_api_applications__application_id__sign_post
       parameters:
       - in: path
@@ -4902,7 +4898,7 @@ paths:
                     updated_at: '2026-10-20T18:00:00Z'
               schema:
                 $ref: '#/components/schemas/ClientApplication'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
         '400':
           content:
             application/json:
@@ -5095,7 +5091,7 @@ paths:
         атомарны. Полнота анкеты и согласие на проверки будут проверяться при реализации.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: submit_application_api_applications__application_id__submit_post
       parameters:
       - in: path
@@ -5162,7 +5158,7 @@ paths:
                     updated_at: '2026-10-20T18:00:00Z'
               schema:
                 $ref: '#/components/schemas/ClientApplication'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
         '400':
           content:
             application/json:
@@ -5348,10 +5344,8 @@ paths:
   /api/auth/csrf:
     get:
       description: 'Получить CSRF-токен до входа или для текущей сессии. Cache-Control: no-store. Привязка
-        к HttpOnly csrf_context cookie, см. описание API. Сейчас токен не выдаётся.
-
-
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        к HttpOnly csrf_context cookie, см. описание API. Повторный вызов сохраняет токен действующего
+        контекста.'
       operationId: csrf_api_auth_csrf_get
       responses:
         '200':
@@ -5364,7 +5358,7 @@ paths:
                     csrf_token: synthetic-csrf-example
               schema:
                 $ref: '#/components/schemas/CSRFResponse'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Успешный ответ
           headers:
             Cache-Control:
               schema:
@@ -5389,6 +5383,33 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректный запрос
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
+            X-Request-ID:
+              schema:
+                format: uuid
+                type: string
+        '401':
+          content:
+            application/json:
+              examples:
+                error:
+                  summary: 'Синтетический пример: error'
+                  value:
+                    code: UNAUTHENTICATED
+                    field_errors: []
+                    message: Требуется вход
+                    request_id: 80000000-0000-4000-8000-000000000001
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Требуется вход
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5411,6 +5432,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректные параметры запроса
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5430,6 +5455,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Слишком много запросов
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5449,25 +5478,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Внутренняя ошибка
           headers:
-            X-Request-ID:
+            Cache-Control:
               schema:
-                format: uuid
+                const: no-store
                 type: string
-        '501':
-          content:
-            application/json:
-              examples:
-                error:
-                  summary: 'Синтетический пример: error'
-                  value:
-                    code: NOT_IMPLEMENTED
-                    field_errors: []
-                    message: Контракт определён; бизнес-операция пока не реализована
-                    request_id: 80000000-0000-4000-8000-000000000001
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Контракт определён; бизнес-операция пока не реализована
-          headers:
             X-Request-ID:
               schema:
                 format: uuid
@@ -5479,11 +5493,8 @@ paths:
       x-required-roles: []
   /api/auth/login:
     post:
-      description: 'Вход по логину и паролю. Нужен CSRF-токен анонимного контекста. Будущий ответ — только
-        пользователь, JWT устанавливается в HttpOnly cookie.
-
-
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+      description: Вход по логину и паролю. Нужен CSRF-токен анонимного контекста. Ответ — только пользователь,
+        JWT устанавливается в HttpOnly cookie.
       operationId: login_api_auth_login_post
       requestBody:
         content:
@@ -5518,11 +5529,15 @@ paths:
                     role: underwriter
               schema:
                 $ref: '#/components/schemas/User'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Успешный ответ
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             Set-Cookie:
-              description: 'Будущая cookie access_token: HttpOnly; SameSite=Lax; Path=/; Secure при HTTPS.
-                JWT отсутствует в теле. CSRF-контекст ротируется.'
+              description: 'Cookie access_token: HttpOnly; SameSite=Lax; Path=/; Secure при HTTPS. JWT
+                отсутствует в теле. CSRF-контекст ротируется.'
               schema:
                 type: string
         '400':
@@ -5540,6 +5555,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректный запрос
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5559,6 +5578,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Требуется вход
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5578,6 +5601,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Недостаточно прав или неверный CSRF-токен
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5597,6 +5624,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Конфликт состояния, ревизии или ключа идемпотентности
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5619,6 +5650,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректные параметры запроса
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5638,6 +5673,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Слишком много запросов
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5657,25 +5696,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Внутренняя ошибка
           headers:
-            X-Request-ID:
+            Cache-Control:
               schema:
-                format: uuid
+                const: no-store
                 type: string
-        '501':
-          content:
-            application/json:
-              examples:
-                error:
-                  summary: 'Синтетический пример: error'
-                  value:
-                    code: NOT_IMPLEMENTED
-                    field_errors: []
-                    message: Контракт определён; бизнес-операция пока не реализована
-                    request_id: 80000000-0000-4000-8000-000000000001
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Контракт определён; бизнес-операция пока не реализована
-          headers:
             X-Request-ID:
               schema:
                 format: uuid
@@ -5688,19 +5712,20 @@ paths:
       x-required-roles: []
   /api/auth/logout:
     post:
-      description: 'Выход: будущая инвалидация сессии и очистка access_token/CSRF-контекста. После выхода
-        снова получить CSRF-токен. Тело успешного ответа пустое.
-
-
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+      description: 'Выход: инвалидация сессии и очистка access_token/CSRF-контекста. После выхода снова
+        получить CSRF-токен. Тело успешного ответа пустое.'
       operationId: logout_api_auth_logout_post
       responses:
         '204':
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Успешный ответ
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             Set-Cookie:
-              description: 'Будущая cookie access_token: HttpOnly; SameSite=Lax; Path=/; Secure при HTTPS.
-                JWT отсутствует в теле. CSRF-контекст ротируется.'
+              description: 'Cookie access_token: HttpOnly; SameSite=Lax; Path=/; Secure при HTTPS. JWT
+                отсутствует в теле. CSRF-контекст ротируется.'
               schema:
                 type: string
         '400':
@@ -5718,6 +5743,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректный запрос
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5737,6 +5766,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Требуется вход
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5756,6 +5789,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Недостаточно прав или неверный CSRF-токен
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5775,6 +5812,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Ресурс не найден или недоступен этому владельцу
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5794,6 +5835,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Конфликт состояния, ревизии или ключа идемпотентности
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5816,6 +5861,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректные параметры запроса
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5835,6 +5884,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Слишком много запросов
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5854,25 +5907,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Внутренняя ошибка
           headers:
-            X-Request-ID:
+            Cache-Control:
               schema:
-                format: uuid
+                const: no-store
                 type: string
-        '501':
-          content:
-            application/json:
-              examples:
-                error:
-                  summary: 'Синтетический пример: error'
-                  value:
-                    code: NOT_IMPLEMENTED
-                    field_errors: []
-                    message: Контракт определён; бизнес-операция пока не реализована
-                    request_id: 80000000-0000-4000-8000-000000000001
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Контракт определён; бизнес-операция пока не реализована
-          headers:
             X-Request-ID:
               schema:
                 format: uuid
@@ -5888,10 +5926,7 @@ paths:
       - underwriter
   /api/auth/me:
     get:
-      description: 'Текущий пользователь.
-
-
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+      description: Текущий пользователь.
       operationId: me_api_auth_me_get
       responses:
         '200':
@@ -5907,7 +5942,12 @@ paths:
                     role: client
               schema:
                 $ref: '#/components/schemas/User'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Успешный ответ
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
         '400':
           content:
             application/json:
@@ -5923,6 +5963,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректный запрос
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5942,6 +5986,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Требуется вход
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5961,6 +6009,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Недостаточно прав или неверный CSRF-токен
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5980,6 +6032,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Ресурс не найден или недоступен этому владельцу
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -6002,6 +6058,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректные параметры запроса
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -6021,6 +6081,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Слишком много запросов
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -6040,25 +6104,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Внутренняя ошибка
           headers:
-            X-Request-ID:
+            Cache-Control:
               schema:
-                format: uuid
+                const: no-store
                 type: string
-        '501':
-          content:
-            application/json:
-              examples:
-                error:
-                  summary: 'Синтетический пример: error'
-                  value:
-                    code: NOT_IMPLEMENTED
-                    field_errors: []
-                    message: Контракт определён; бизнес-операция пока не реализована
-                    request_id: 80000000-0000-4000-8000-000000000001
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Контракт определён; бизнес-операция пока не реализована
-          headers:
             X-Request-ID:
               schema:
                 format: uuid
@@ -6077,7 +6126,7 @@ paths:
         только формат ИНН. Компания не найдена — 200 с company=null.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: company_lookup_api_companies_lookup_get
       parameters:
       - in: query
@@ -6107,7 +6156,7 @@ paths:
                     company: null
               schema:
                 $ref: '#/components/schemas/CompanyLookup'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
         '400':
           content:
             application/json:
@@ -6275,7 +6324,7 @@ paths:
       description: 'Список кредитных продуктов. Ставки и кредитные ограничения не определяются этим контрактом.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: products_api_products_get
       responses:
         '200':
@@ -6294,7 +6343,7 @@ paths:
                       - Развитие бизнеса
               schema:
                 $ref: '#/components/schemas/ProductList'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
         '400':
           content:
             application/json:
@@ -6464,7 +6513,7 @@ paths:
         Сортировка updated_at ASC, id ASC. Доступ только underwriter.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: queue_api_underwriter_applications_get
       parameters:
       - in: query
@@ -6510,7 +6559,7 @@ paths:
                     total: 1
               schema:
                 $ref: '#/components/schemas/Page_UnderwriterQueueItem_'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
         '400':
           content:
             application/json:
@@ -6679,7 +6728,7 @@ paths:
         аналитическим объяснением. Никогда не использовать её схему в клиентском API.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: bank_card_api_underwriter_applications__application_id__get
       parameters:
       - in: path
@@ -6743,7 +6792,7 @@ paths:
                       source: automatic
               schema:
                 $ref: '#/components/schemas/UnderwriterApplication'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
         '400':
           content:
             application/json:
@@ -6914,7 +6963,7 @@ paths:
         — только банку.
 
 
-        Заглушка: 501. JWT/роли/CSRF пока только в контракте.'
+        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: manual_decision_api_underwriter_applications__application_id__decision_post
       parameters:
       - in: path
@@ -7066,7 +7115,7 @@ paths:
                       source: underwriter
               schema:
                 $ref: '#/components/schemas/UnderwriterApplication'
-          description: Будущий успешный ответ (пока возвращается 501)
+          description: Будущий успешный ответ (после проверок доступа пока 501)
         '400':
           content:
             application/json:
