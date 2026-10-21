@@ -41,3 +41,14 @@ TypeScript 5.9.3 (Apache-2.0), запускаются через npm во вре
 в зависимости приложения и frontend не добавлены.
 Prism CLI 5.16.0 (Apache-2.0) также использован только для временного smoke-теста
 именованных примеров контракта.
+
+## Миграции БД (B03)
+
+Runtime-зависимость и новые транзитивные зависимости; версии и хеши зафиксированы
+в `backend/uv.lock`.
+
+| Библиотека | Версия | Лицензия | Использование |
+| --- | --- | --- | --- |
+| [Alembic](https://pypi.org/project/alembic/) | 1.20.0 | MIT | Миграции схемы SQLAlchemy/PostgreSQL |
+| [Mako](https://pypi.org/project/Mako/) | 1.4.3 | MIT | Шаблон генерации миграций Alembic |
+| [MarkupSafe](https://pypi.org/project/MarkupSafe/) | 3.0.4 | BSD-3-Clause | Экранирование в Mako |
