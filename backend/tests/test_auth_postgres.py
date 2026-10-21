@@ -508,3 +508,93 @@ def test_local_http_cookie_opt_in(auth_settings):
             client.post("/api/auth/logout", headers=headers(token, "http://testserver")).status_code
             == 204
         )
+
+
+@pytest.mark.parametrize("reason", ["revoked", "removed", "secret_rotated", "malformed", "expired"])
+def test_csrf_recovers_invalid_browser_session(client, auth_settings, reason):
+    login(client)
+    old_csrf = csrf(client)
+    old_cookie = client.cookies.get("csrf_context")
+    claims = decode_session(auth_settings, client.cookies.get("access_token"))
+    session_id = UUID(claims["sid"])
+
+    async def invalidate(db):
+        session = await db.get(AuthSession, session_id)
+        if reason == "revoked":
+            session.revoked_at = datetime.now(UTC)
+        else:
+            await db.execute(delete(CSRFContext).where(CSRFContext.session_id == session_id))
+            await db.delete(session)
+
+    settings = auth_settings
+    if reason in {"revoked", "removed"}:
+        in_database(settings, invalidate)
+    elif reason == "secret_rotated":
+        settings = settings.model_copy(
+            update={"auth_jwt_secret": SecretStr("rotated-test-secret-with-at-least-32-characters")}
+        )
+    else:
+        # Keep a browser-valid cookie while its JWT is invalid or expired.
+        token = "malformed-jwt"
+        if reason == "expired":
+            claims["exp"] = int((datetime.now(UTC) - timedelta(seconds=60)).timestamp())
+            token = jwt.encode(claims, SECRET, algorithm="HS256")
+        for cookie in client.cookies.jar:
+            if cookie.name == "access_token":
+                cookie.value = token
+
+    with TestClient(create_app(settings), base_url=ORIGIN) as browser:
+        browser.cookies.update(client.cookies)
+        credentials = {"login": CLIENT["login"], "password": CLIENT["password"]}
+        assert browser.get("/api/auth/me").status_code == 401
+        assert browser.post("/api/auth/logout", headers=headers(old_csrf)).status_code == 401
+        assert (
+            browser.post("/api/auth/login", json=credentials, headers=headers(old_csrf)).status_code
+            == 401
+        )
+
+        response = browser.get("/api/auth/csrf")
+        assert response.status_code == 200
+        assert response.headers["cache-control"] == "no-store"
+        assert browser.cookies.get("access_token") is None
+        assert browser.cookies.get("csrf_context") != old_cookie
+        cleared = next(h for h in response.headers.get_list("set-cookie") if "access_token=" in h)
+        assert all(
+            flag in cleared
+            for flag in ("Max-Age=0", "HttpOnly", "Secure", "SameSite=lax", "Path=/")
+        )
+        new_csrf = response.json()["csrf_token"]
+        assert new_csrf != old_csrf and csrf(browser) == new_csrf
+        assert browser.get("/api/auth/me").status_code == 401
+        assert (
+            browser.post("/api/auth/login", json=credentials, headers=headers(old_csrf)).status_code
+            == 403
+        )
+        assert (
+            browser.post(
+                "/api/auth/login", json=credentials, headers={"X-CSRF-Token": new_csrf}
+            ).status_code
+            == 403
+        )
+        assert (
+            browser.post(
+                "/api/auth/login",
+                json=credentials,
+                headers=headers(new_csrf, "https://foreign.test"),
+            ).status_code
+            == 403
+        )
+        assert (
+            browser.post(
+                "/api/auth/login",
+                json={**credentials, "password": "wrong"},
+                headers=headers(new_csrf),
+            ).status_code
+            == 401
+        )
+        assert (
+            browser.post("/api/auth/login", json=credentials, headers=headers(new_csrf)).status_code
+            == 200
+        )
+        assert browser.get("/api/auth/me").json()["login"] == CLIENT["login"]
+        assert csrf(browser) != new_csrf

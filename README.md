@@ -38,8 +38,10 @@
 
 ## Запуск
 
-Реализована задача 1: инфраструктура backend. Бизнес-модели, авторизация,
-worker, внешние моки и скоринг пока не реализованы.
+В main завершены B01–B04: инфраструктура, API-контракт, ORM/миграции,
+авторизация и импорт тестовых аккаунтов. Моки и модуль решений добавлены
+участником по рискам; подключение конвейера, бизнес-CRUD, worker и SSE ещё впереди.
+Текущий статус: [план бэкенда](backend/PLAN.md).
 
 ### Стек и компоненты
 
@@ -49,7 +51,7 @@ worker, внешние моки и скоринг пока не реализов
   [`backend/uv.lock`](backend/uv.lock). Docker устанавливает их с `--locked`.
 
 Backend создаёт async engine и фабрику сессий на время жизни приложения и
-освобождает пул при завершении. Таблицы пока не создаются. При обычном запуске
+освобождает пул при завершении. Таблицы создаются явным запуском Alembic. При обычном запуске
 Compose ждёт healthcheck PostgreSQL перед запуском backend; уже работающий
 backend продолжает отвечать на liveness при отказе БД.
 
@@ -60,6 +62,32 @@ backend продолжает отвечать на liveness при отказе 
 
 ```bash
 cp .env.example .env
+# Сгенерируйте секрет и внесите его в AUTH_JWT_SECRET в .env:
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+В `.env` задайте собственный `POSTGRES_PASSWORD` и сгенерированный
+`AUTH_JWT_SECRET` (минимум 32 символа). Для локального HTTP оставьте
+`AUTH_COOKIE_SECURE=false`, `AUTH_ALLOWED_ORIGIN=http://localhost:8000`.
+При смене порта измените также origin. Секреты не коммитить.
+Затем из корня:
+
+```bash
+docker compose up -d --wait db
+docker compose build backend
+docker compose run --rm backend alembic upgrade head
+docker compose run --rm backend alembic check
+docker compose run --rm backend python -m app.seed --accounts /seed/accounts.json
+docker compose up -d --wait backend
+```
+
+Миграции и seed пока выполняются явно; автоматизация первого запуска — B10.
+Импорт повторяемый: первый запуск создаёт 10 аккаунтов, повторный — 0.
+`seed/accounts.json` должен читаться пользователем контейнера UID 10001;
+для нестандартных прав файла см. [инструкцию бэкенда](backend/README.md).
+Для запуска также моков:
+
+```bash
 docker compose up --build --wait
 ```
 
@@ -75,8 +103,8 @@ docker compose down     # остановить, сохранить данные
 
 ### Окружение
 
-Скопируйте [`.env.example`](.env.example) и задайте пароль. Значение в примере
-предназначено только для локальной разработки. `.env` не коммитится и не попадает в образ.
+Скопируйте [`.env.example`](.env.example), задайте пароль БД и `AUTH_JWT_SECRET`. Пароль в примере
+предназначен только для локальной разработки. `.env` не коммитится и не попадает в образ.
 Настройки проверяются при старте backend; отсутствие пароля или неверные значения
 приводят к ошибке конфигурации.
 
@@ -89,6 +117,11 @@ docker compose down     # остановить, сохранить данные
 | `POSTGRES_PORT` | Порт БД на хосте | `5432` |
 | `DB_READINESS_TIMEOUT` | Таймаут операции проверки БД, секунды (0.1–10) | `2` |
 | `BACKEND_PORT` | HTTP-порт backend на хосте | `8000` |
+| `AUTH_JWT_SECRET` | Обязательный случайный секрет JWT/CSRF, минимум 32 символа | Пусто, нужно сгенерировать |
+| `AUTH_ALLOWED_ORIGIN` | Точный origin для мутаций, без завершающего `/` | `http://localhost:8000` |
+| `AUTH_COOKIE_SECURE` | Только HTTPS cookies; `false` для локального HTTP | `false` |
+
+Все настройки авторизации и проверка входа: [backend/README.md](backend/README.md).
 
 Внутри Compose backend всегда подключается к `db:5432`, независимо от порта на хосте.
 Пароль передаётся в SQLAlchemy URL отдельным полем, поэтому спецсимволы не требуют
@@ -104,6 +137,8 @@ docker compose down     # остановить, сохранить данные
 docker compose up -d --wait db
 cd backend
 uv sync --locked
+uv run --locked --env-file ../.env alembic upgrade head
+uv run --locked --env-file ../.env python -m app.seed --accounts ../seed/accounts.json
 uv run --locked uvicorn app.main:app --env-file ../.env --reload
 ```
 
@@ -117,7 +152,9 @@ uv run --locked pytest -q
 ```
 
 Pytest проверяет liveness, readiness при реальном отказе подключения asyncpg,
-Swagger/OpenAPI и настройки окружения. БД для этих проверок не нужна, подмен нет.
+Swagger/OpenAPI и настройки окружения. Проверки миграций и авторизации с реальной
+PostgreSQL 16 включаются отдельно через `--run-postgres`; без флага они пропускаются.
+Настройка изолированной БД описана в [backend/README.md](backend/README.md).
 Из корня репозитория полный Docker smoke-тест:
 
 ```bash
