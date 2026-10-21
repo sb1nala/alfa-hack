@@ -5,7 +5,7 @@ from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Requ
 from sqlalchemy import func, select, true
 from sqlalchemy.orm import aliased
 
-from app import drafts
+from app import drafts, submissions
 from app.api import examples as ex
 from app.api.contract import endpoint, not_implemented
 from app.dependencies import (
@@ -29,6 +29,7 @@ from app.schemas.applications import (
     SubmitRequest,
 )
 from app.schemas.common import ApplicationStatus, Page, PageQuery
+from app.transitions import lock_application
 
 router = APIRouter(prefix="/api/applications", tags=["applications"])
 
@@ -158,16 +159,7 @@ async def edit_application(
     principal: ClientPrincipal,
     request: Request,
 ) -> ClientApplication:
-    # Refresh the guard's identity-map entry after taking the row lock: another
-    # request may have committed since the access dependency first read it.
-    application = await db.scalar(
-        select(Application)
-        .where(Application.id == application_id, Application.owner_id == principal.user.id)
-        .with_for_update()
-        .execution_options(populate_existing=True)
-    )
-    if application is None:
-        raise HTTPException(404)
+    application = await lock_application(db, application_id, owner_id=principal.user.id)
     if application.status != "DRAFT" or application.revision != body.expected_revision:
         raise HTTPException(409)
     await drafts.apply_fields(db, application, body)
@@ -195,16 +187,19 @@ async def edit_application(
         "Отправка DRAFT → SUBMITTED, 202: конвейер запустится асинхронно позднее. "
         "expected_revision обязателен. Idempotency-Key — UUID, генерирует клиент для "
         "одной попытки. "
-        "Будущее поведение: область ключа (пользователь, заявка, submit), хранение "
+        "Область ключа (пользователь, заявка, submit), хранение "
         "минимум 24 часа; "
         "тот же ключ + тот же JSON-запрос возвращает исходный 202 и снимок ответа "
         "без новой отправки "
         "(проверка повтора до ревизии); тот же ключ + другой запрос — 409; "
         "другой ключ при устаревшей ревизии/не-DRAFT — 409. Проверка и запись атомарны. "
-        "Полнота анкеты и согласие на проверки будут проверяться при реализации.",
+        "Проверяются компания, активный продукт, цель, положительные сумма/срок и согласие. "
+        "Выручка необязательна. Снимок входов, аудит, задание и ответ сохраняются одной "
+        "транзакцией. В B06 заявка остаётся SUBMITTED до подключения worker B07.",
         mutation=True,
         status_code=202,
         access=owned_application,
+        implemented=True,
     ),
 )
 async def submit_application(
@@ -214,8 +209,15 @@ async def submit_application(
         Body(openapi_examples=ex.examples({"submit": {**ex.REVISION, "consent_to_checks": True}})),
     ],
     idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key", examples=[ex.EVENT_ID])],
+    db: DBSession,
+    principal: ClientPrincipal,
+    request: Request,
 ) -> ClientApplication:
-    not_implemented()
+    result = await submissions.submit(
+        db, application_id, body, idempotency_key, principal, request.state.request_id
+    )
+    await db.commit()
+    return result
 
 
 @router.post(
@@ -231,16 +233,24 @@ async def submit_application(
             }
         },
         "Отмена активной заявки до SIGNED → CANCELLED согласно docs/application-states.md. "
-        "Требуется expected_revision; переход реализуется в B06.",
+        "Требуется expected_revision; конфликт статуса/ревизии — 409. "
+        "Причина сохраняется во внутреннем аудите, ожидающее/захваченное задание "
+        "инвалидируется атомарно. Worker обязан перепроверить актуальность результата.",
         mutation=True,
         access=owned_application,
+        implemented=True,
     ),
 )
 async def cancel_application(
     application_id: ApplicationID,
     body: Annotated[CancelRequest, Body(openapi_examples=ex.examples({"cancel": ex.REVISION}))],
+    db: DBSession,
+    principal: ClientPrincipal,
+    request: Request,
 ) -> ClientApplication:
-    not_implemented()
+    result = await submissions.cancel(db, application_id, body, principal, request.state.request_id)
+    await db.commit()
+    return result
 
 
 @router.post(

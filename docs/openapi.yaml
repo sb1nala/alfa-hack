@@ -1616,7 +1616,11 @@ info:
 
     Каталог продуктов, поиск компании через локальный мок ЕГРЮЛ, создание, список,
 
-    чтение и редактирование черновиков работают с PostgreSQL.
+    чтение и редактирование черновиков, submit и cancel работают с PostgreSQL.
+
+    Submit атомарно сохраняет аудит, снимок входов, задание и идемпотентный ответ.
+
+    В B06 заявка остаётся SUBMITTED: worker и кредитные решения — следующие этапы.
 
     Остальные бизнес-операции остаются заглушками и после проверок доступа возвращают 501.
 
@@ -1663,9 +1667,9 @@ info:
 
     Статусы/переходы — docs/application-states.md. Отмена разрешена из активных
 
-    состояний до SIGNED, исключая конечные REJECTED, ISSUED, CANCELLED. Бизнес-переходы
+    состояний до SIGNED, исключая конечные REJECTED, ISSUED, CANCELLED. Submit и cancel реализованы.
 
-    здесь не реализованы. allowed_actions — подсказка интерфейсу; будущий сервис обязан
+    allowed_actions — подсказка интерфейсу; сервис обязан
 
     проверять права, статус и ревизию при выполнении операции.
 
@@ -3339,11 +3343,9 @@ paths:
       - client
   /api/applications/{application_id}/cancel:
     post:
-      description: 'Отмена активной заявки до SIGNED → CANCELLED согласно docs/application-states.md.
-        Требуется expected_revision; переход реализуется в B06.
-
-
-        Бизнес-заглушка: 501 после проверок доступа.'
+      description: Отмена активной заявки до SIGNED → CANCELLED согласно docs/application-states.md. Требуется
+        expected_revision; конфликт статуса/ревизии — 409. Причина сохраняется во внутреннем аудите, ожидающее/захваченное
+        задание инвалидируется атомарно. Worker обязан перепроверить актуальность результата.
       operationId: cancel_application_api_applications__application_id__cancel_post
       parameters:
       - in: path
@@ -3399,7 +3401,12 @@ paths:
                     updated_at: '2026-10-20T18:00:00Z'
               schema:
                 $ref: '#/components/schemas/ClientApplication'
-          description: Будущий успешный ответ (после проверок доступа пока 501)
+          description: Успешный ответ
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
         '400':
           content:
             application/json:
@@ -3415,6 +3422,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректный запрос
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -3434,6 +3445,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Требуется вход
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -3453,6 +3468,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Недостаточно прав или неверный CSRF-токен
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -3472,6 +3491,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Ресурс не найден или недоступен этому владельцу
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -3491,6 +3514,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Конфликт состояния, ревизии или ключа идемпотентности
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -3513,6 +3540,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректные параметры запроса
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -3532,6 +3563,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Слишком много запросов
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -3551,25 +3586,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Внутренняя ошибка
           headers:
-            X-Request-ID:
+            Cache-Control:
               schema:
-                format: uuid
+                const: no-store
                 type: string
-        '501':
-          content:
-            application/json:
-              examples:
-                error:
-                  summary: 'Синтетический пример: error'
-                  value:
-                    code: NOT_IMPLEMENTED
-                    field_errors: []
-                    message: Контракт определён; бизнес-операция пока не реализована
-                    request_id: 80000000-0000-4000-8000-000000000001
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Контракт определён; бизнес-операция пока не реализована
-          headers:
             X-Request-ID:
               schema:
                 format: uuid
@@ -5135,14 +5155,13 @@ paths:
   /api/applications/{application_id}/submit:
     post:
       description: 'Отправка DRAFT → SUBMITTED, 202: конвейер запустится асинхронно позднее. expected_revision
-        обязателен. Idempotency-Key — UUID, генерирует клиент для одной попытки. Будущее поведение: область
-        ключа (пользователь, заявка, submit), хранение минимум 24 часа; тот же ключ + тот же JSON-запрос
-        возвращает исходный 202 и снимок ответа без новой отправки (проверка повтора до ревизии); тот
-        же ключ + другой запрос — 409; другой ключ при устаревшей ревизии/не-DRAFT — 409. Проверка и запись
-        атомарны. Полнота анкеты и согласие на проверки будут проверяться при реализации.
-
-
-        Бизнес-заглушка: 501 после проверок доступа.'
+        обязателен. Idempotency-Key — UUID, генерирует клиент для одной попытки. Область ключа (пользователь,
+        заявка, submit), хранение минимум 24 часа; тот же ключ + тот же JSON-запрос возвращает исходный
+        202 и снимок ответа без новой отправки (проверка повтора до ревизии); тот же ключ + другой запрос
+        — 409; другой ключ при устаревшей ревизии/не-DRAFT — 409. Проверка и запись атомарны. Проверяются
+        компания, активный продукт, цель, положительные сумма/срок и согласие. Выручка необязательна.
+        Снимок входов, аудит, задание и ответ сохраняются одной транзакцией. В B06 заявка остаётся SUBMITTED
+        до подключения worker B07.'
       operationId: submit_application_api_applications__application_id__submit_post
       parameters:
       - in: path
@@ -5209,7 +5228,12 @@ paths:
                     updated_at: '2026-10-20T18:00:00Z'
               schema:
                 $ref: '#/components/schemas/ClientApplication'
-          description: Будущий успешный ответ (после проверок доступа пока 501)
+          description: Успешный ответ
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
         '400':
           content:
             application/json:
@@ -5225,6 +5249,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректный запрос
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5244,6 +5272,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Требуется вход
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5263,6 +5295,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Недостаточно прав или неверный CSRF-токен
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5282,6 +5318,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Ресурс не найден или недоступен этому владельцу
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5301,6 +5341,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Конфликт состояния, ревизии или ключа идемпотентности
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5323,6 +5367,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректные параметры запроса
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5342,6 +5390,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Слишком много запросов
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -5361,25 +5413,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Внутренняя ошибка
           headers:
-            X-Request-ID:
+            Cache-Control:
               schema:
-                format: uuid
+                const: no-store
                 type: string
-        '501':
-          content:
-            application/json:
-              examples:
-                error:
-                  summary: 'Синтетический пример: error'
-                  value:
-                    code: NOT_IMPLEMENTED
-                    field_errors: []
-                    message: Контракт определён; бизнес-операция пока не реализована
-                    request_id: 80000000-0000-4000-8000-000000000001
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Контракт определён; бизнес-операция пока не реализована
-          headers:
             X-Request-ID:
               schema:
                 format: uuid

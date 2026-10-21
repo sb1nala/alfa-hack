@@ -104,6 +104,13 @@ def database(request):
         asyncio.run(legacy_data(insert=True))
         migrate(settings, "upgrade", "head")
         asyncio.run(legacy_data())
+        migrate(settings, "downgrade", "b05_product_policy")
+        assert not {"application_submissions", "pipeline_jobs", "submit_idempotency"} & set(
+            asyncio.run(tables())
+        )
+        asyncio.run(legacy_data())
+        migrate(settings, "upgrade", "head")
+        migrate(settings, "check")
         migrate(settings, "downgrade", "b03_initial")
         asyncio.run(legacy_data())
         migrate(settings, "upgrade", "head")

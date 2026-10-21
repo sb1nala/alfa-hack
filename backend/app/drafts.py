@@ -3,12 +3,13 @@
 from decimal import Decimal
 
 from fastapi.exceptions import RequestValidationError
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.catalog import company_identity, public_product
-from app.models import Application, ApplicationEvent, Decision, Offer, Product
+from app.models import Application, Decision, Offer, Product
 from app.schemas.applications import ClientApplication, ClientApplicationSummary, DraftFields
+from app.transitions import append_event
 
 ACTION_MAP = {
     "DRAFT": ["edit", "submit", "cancel", "upload_document"],
@@ -133,26 +134,14 @@ async def apply_fields(db: AsyncSession, application: Application, body: DraftFi
 
 
 async def audit(db, application, principal, request_id, *, created=False):
-    # PATCH holds the application row lock, so sequence allocation is serialized.
-    sequence = (
-        await db.scalar(
-            select(func.coalesce(func.max(ApplicationEvent.sequence), 0)).where(
-                ApplicationEvent.application_id == application.id
-            )
-        )
-    ) + 1
-    db.add(
-        ApplicationEvent(
-            application_id=application.id,
-            sequence=sequence,
-            revision=application.revision,
-            event_type="application_updated",
-            previous_status=None if created else application.status,
-            status=application.status,
-            actor_user_id=principal.user.id,
-            actor_kind=principal.user.role,
-            request_id=request_id,
-            public_message="Черновик создан" if created else "Черновик сохранён",
-            audit_payload={},
-        )
+    await append_event(
+        db,
+        application,
+        actor_kind=principal.user.role,
+        actor_user_id=principal.user.id,
+        request_id=request_id,
+        event_type="application_updated",
+        previous_status=None if created else application.status,
+        public_message="Черновик создан" if created else "Черновик сохранён",
+        audit_payload={},
     )

@@ -485,6 +485,11 @@ def test_all_business_routes_check_access(client, account, resources, monkeypatc
                 kwargs["json"] = {}
             elif method == "patch":
                 kwargs["json"] = {"expected_revision": 1}
+        if path.endswith("/submit"):
+            expected = 409  # PATCH above already advanced this shared partial draft.
+        if path.endswith("/cancel"):
+            expected = 200
+            kwargs["json"] = {"expected_revision": 2}
         if role not in roles:
             expected = 403
         elif account == SECOND and "{application_id}" in path:

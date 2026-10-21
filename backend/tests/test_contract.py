@@ -126,6 +126,11 @@ def test_contract_structure_and_examples_per_operation(path, method, operation):
         path.startswith("/api/auth/")
         or path in {"/api/products", "/api/companies/lookup", "/api/applications"}
         or (path == "/api/applications/{application_id}" and method in {"get", "patch"})
+        or path
+        in {
+            "/api/applications/{application_id}/submit",
+            "/api/applications/{application_id}/cancel",
+        }
     )
     assert ("501" in operation["responses"]) == (not implemented)
     assert "422" in operation["responses"]
@@ -354,13 +359,16 @@ def test_export_without_secrets_or_database_is_repeatable(tmp_path):
     }
     output = tmp_path / "openapi.yaml"
     command = [sys.executable, "-m", "app.export_openapi", "--output", str(output)]
-    subprocess.run(command, env=env, check=True, capture_output=True)
+    cwd = Path(__file__).resolve().parents[1]
+    subprocess.run(command, cwd=cwd, env=env, check=True, capture_output=True)
     first = output.read_bytes()
-    subprocess.run(command, env=env, check=True, capture_output=True)
+    subprocess.run(command, cwd=cwd, env=env, check=True, capture_output=True)
     assert first == output.read_bytes() == DEFAULT_OUTPUT.read_bytes()
     assert yaml.safe_load(first) == SCHEMA
     assert TestClient(create_app()).get("/openapi.json").json() == SCHEMA
     assert render_openapi().encode() == first
-    subprocess.run([*command, "--check"], env=env, check=True, capture_output=True)
+    subprocess.run([*command, "--check"], cwd=cwd, env=env, check=True, capture_output=True)
     output.write_text("outdated: true\n")
-    assert subprocess.run([*command, "--check"], env=env, capture_output=True).returncode == 1
+    assert (
+        subprocess.run([*command, "--check"], cwd=cwd, env=env, capture_output=True).returncode == 1
+    )
