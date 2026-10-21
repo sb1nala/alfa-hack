@@ -12,6 +12,7 @@ from app.dependencies import (
     CurrentPrincipal,
     DBSession,
     Principal,
+    csrf_principal,
     find_context,
     optional_principal,
     require_csrf,
@@ -63,7 +64,7 @@ async def csrf(
     request: Request,
     response: Response,
     db: DBSession,
-    principal: Annotated[Principal | None, Depends(optional_principal)],
+    principal: Annotated[Principal | None, Depends(csrf_principal)],
 ) -> CSRFResponse:
     context = await find_context(request, db, principal)
     if context is None:

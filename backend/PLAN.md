@@ -1,8 +1,8 @@
 # Бэкенд: план реализации и текущий статус
 
-> Обновлено: 21 октября 2026, МСК. Основание B04 — актуальный `main` на коммите
-> [`0f156a5`](https://github.com/sb1nala/alfa-hack/commit/0f156a5).
-> **Завершены B01–B03 (B03 — PR #41). B04 — [На ревью, PR #49](https://github.com/sb1nala/alfa-hack/pull/49); ближайший этап B05.**
+> Обновлено: 21 октября 2026, МСК. B04 слит в `main` коммитом
+> [`5cc380f`](https://github.com/sb1nala/alfa-hack/commit/5cc380f).
+> **Завершены B01–B04 (B03 — PR #41). B04 — [Готово, PR #49](https://github.com/sb1nala/alfa-hack/pull/49); ближайший этап B05.**
 > Рабочего сквозного кредитного сценария ещё нет.
 
 ## Что уже доступно команде
@@ -12,6 +12,7 @@
 | B01 — каркас | FastAPI, Python 3.12, async SQLAlchemy 2/asyncpg, PostgreSQL 16, uv.lock, Docker-сервисы db/backend, health endpoints и Swagger | [PR #32](https://github.com/sb1nala/alfa-hack/pull/32), слит 20.10 |
 | B02 — контракт | 23 бизнес-операции, Pydantic-схемы, единые ошибки, экспорт OpenAPI, описание модели данных v1 | [PR #33](https://github.com/sb1nala/alfa-hack/pull/33), слит 21.10 |
 | B03 — хранение | Восемь бизнес-таблиц, ORM, Alembic b03_initial | [PR #41](https://github.com/sb1nala/alfa-hack/pull/41), слит |
+| B04 — авторизация | JWT-сессии, CSRF, роли, импорт 10 аккаунтов | [PR #49](https://github.com/sb1nala/alfa-hack/pull/49), слит 21.10 |
 
 Фронтенд уже может использовать [OpenAPI](../docs/openapi.yaml) для генерации типов и Prism.
 Auth csrf/login/me/logout реализован в B04. JWT, роли, Origin, CSRF и доступ к
@@ -56,7 +57,7 @@ ORM и начальную миграцию (PR #41); B04 добавляет се
 | B01 | Готово | FastAPI и PostgreSQL в Docker | — | Часть [#1](https://github.com/sb1nala/alfa-hack/issues/1); PR #32 |
 | B02 | Готово | API-заглушки, OpenAPI и модель данных v1 | B01 | [#2](https://github.com/sb1nala/alfa-hack/issues/2), документ из [#3](https://github.com/sb1nala/alfa-hack/issues/3); PR #33 |
 | B03 | Готово | ORM-модели и начальные миграции | B02 | [PR #41](https://github.com/sb1nala/alfa-hack/pull/41); продолжение #3; основа [#8](https://github.com/sb1nala/alfa-hack/issues/8) |
-| B04 | На ревью | JWT, роли, CSRF и импорт тестовых аккаунтов | B03; данные рисков | [#7](https://github.com/sb1nala/alfa-hack/issues/7); [PR #49](https://github.com/sb1nala/alfa-hack/pull/49) |
+| B04 | Готово | JWT, роли, CSRF и импорт тестовых аккаунтов | B03; данные рисков | [#7](https://github.com/sb1nala/alfa-hack/issues/7); [PR #49](https://github.com/sb1nala/alfa-hack/pull/49) |
 | B05 | Запланировано | Реальный API продуктов, черновиков и карточки | B04; контракт ЕГРЮЛ | #2: замена заглушек; отдельного Issue реализации CRUD пока нет |
 | B06 | Запланировано | Переходы, аудит, submit и очередь | B05; уточнение отмены | [#4](https://github.com/sb1nala/alfa-hack/issues/4), часть [#9](https://github.com/sb1nala/alfa-hack/issues/9) |
 | B07 | Запланировано | Worker, проверки и восстановление заданий | B06; моки рисков | Часть [#5](https://github.com/sb1nala/alfa-hack/issues/5) |
@@ -98,7 +99,7 @@ ORM и начальную миграцию (PR #41); B04 добавляет се
 B03 завершён PR #41. Его результаты проверок выше — сведения этапа B03;
 актуальный прогон B04 приведён ниже. Issue #3 автоматически не закрывается.
 
-### B04. Авторизация и тестовые аккаунты — на ревью
+### B04. Авторизация и тестовые аккаунты — готово (PR #49 слит)
 
 - **Результат:** четыре auth endpoints по B02; Argon2id, JWT HS256 в HttpOnly cookie,
   обязательный runtime-секрет, сессии в PostgreSQL, отзыв и проверка актуальности роли,
@@ -139,6 +140,12 @@ B03 завершён PR #41. Его результаты проверок выш
   Обязательные проверки B04 не пропущены; полный format check имеет оговорку выше.
 
 Команды, настройки, curl и последовательность фронтенда: [README.md](README.md).
+Дополнение после ревью B04: восстановление входа при недействительной cookie
+через `GET /api/auth/csrf`, актуализация корневого README и статуса плана.
+Проверка дополнения: `pytest -q --run-postgres` — **271 passed**, включая пять
+новых сценариев восстановления (отзыв/удаление сессии, смена секрета,
+повреждённый/просроченный JWT); Ruff и проверка экспорта OpenAPI прошли.
+
 Следующий этап **B05**: импортировать согласованные компании/продукты и подключить
 мок ЕГРЮЛ, реализовать CRUD и фильтрацию списка по owner_id, назначать владельца из
 текущей сессии. Использовать зависимости B04; статус/ревизия/аудит и очереди идут далее.

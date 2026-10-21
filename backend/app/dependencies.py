@@ -8,7 +8,7 @@ from functools import lru_cache
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, Path, Request
+from fastapi import Depends, HTTPException, Path, Request, Response
 from jwt import InvalidTokenError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -69,6 +69,23 @@ async def optional_principal(request: Request, db: DBSession) -> Principal | Non
     if "access_token" in request.cookies:
         return await current_principal(request, db)
     return None
+
+
+async def csrf_principal(request: Request, response: Response, db: DBSession) -> Principal | None:
+    """Recover stale browser credentials only on the anonymous CSRF bootstrap."""
+    try:
+        return await optional_principal(request, db)
+    except HTTPException as error:
+        if error.status_code != 401:
+            raise
+        response.delete_cookie(
+            "access_token",
+            path="/",
+            secure=request.app.state.settings.auth_cookie_secure,
+            httponly=True,
+            samesite="lax",
+        )
+        return None
 
 
 @lru_cache
