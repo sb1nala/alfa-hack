@@ -80,3 +80,25 @@ Runtime-зависимость и новые транзитивные завис
 | [cffi](https://pypi.org/project/cffi/) | 2.1.1 | MIT | Транзитивная зависимость bindings |
 | [pycparser](https://pypi.org/project/pycparser/) | 3.11 | BSD-3-Clause | Транзитивная зависимость cffi |
 | [PyJWT](https://pypi.org/project/PyJWT/) | 2.15.1 | MIT | Подпись и проверка JWT, фиксированный HS256 |
+
+## Каркас фронтенда (#11)
+
+Прямые зависимости перечислены ниже; точные версии транзитивных зависимостей
+и integrity-хеши — `frontend/pnpm-lock.yaml`. Все компоненты бесплатные;
+шрифты, изображения и внешние сервисы не подключаются.
+
+| Библиотека | Версия | Лицензия | Использование |
+| --- | --- | --- | --- |
+| [React](https://www.npmjs.com/package/react) / [React DOM](https://www.npmjs.com/package/react-dom) | 18.3.1 | MIT | Интерфейс и DOM-рендеринг |
+| [React Router DOM](https://www.npmjs.com/package/react-router-dom) | 6.30.6 | MIT | Маршруты клиентского и банковского разделов |
+| [TanStack React Query](https://www.npmjs.com/package/@tanstack/react-query) | 5.104.5 | MIT | Провайдер состояния серверных запросов |
+| [MUI Material](https://www.npmjs.com/package/@mui/material) | 9.5.0 | MIT | Компоненты и тема интерфейса |
+| [Emotion React](https://www.npmjs.com/package/@emotion/react) | 11.14.0 | MIT | Стили MUI |
+| [Emotion Styled](https://www.npmjs.com/package/@emotion/styled) | 11.14.1 | MIT | Стили MUI |
+| [Vite](https://www.npmjs.com/package/vite) | 8.3.5 | MIT | Dev: сервер разработки и сборка |
+| [Vite React plugin](https://www.npmjs.com/package/@vitejs/plugin-react) | 6.1.2 | MIT | Dev: React Fast Refresh |
+| [TypeScript](https://www.npmjs.com/package/typescript) | 5.9.3 | Apache-2.0 | Dev: проверка типов |
+| [@types/react](https://www.npmjs.com/package/@types/react) | 18.3.31 | MIT | Dev: типы React |
+| [@types/react-dom](https://www.npmjs.com/package/@types/react-dom) | 18.3.7 | MIT | Dev: типы React DOM |
+| [@types/node](https://www.npmjs.com/package/@types/node) | 24.10.1 | MIT | Dev: типы Node.js для конфигурации Vite |
+| [pnpm](https://www.npmjs.com/package/pnpm) | 11.25.0 | MIT | Менеджер пакетов, версия в packageManager |
