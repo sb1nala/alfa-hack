@@ -1,0 +1,40 @@
+meta {
+  name: Решение — отказать
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/api/underwriter/applications/{{uwApplicationId}}/decision
+  body: json
+  auth: none
+}
+
+headers {
+  X-CSRF-Token: {{csrf}}
+}
+
+body:json {
+  {
+    "expected_revision": {{uwRevision}},
+    "outcome": "REJECTED",
+    "reasons": [
+      {
+        "code": "high_risk",
+        "message": "По совокупности данных о компании риск оказался выше, чем мы можем принять сейчас."
+      }
+    ],
+    "explanation": "Сейчас мы не можем выдать кредит.",
+    "analytical_explanation": "Просрочка + 6 запросов в БКИ за 30 дней — признаки долговой нагрузки."
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect([200]).to.include(res.status);
+  });
+}
+
+docs {
+  Выполните одно из четырёх решений. Клиент увидит его по SSE.
+}

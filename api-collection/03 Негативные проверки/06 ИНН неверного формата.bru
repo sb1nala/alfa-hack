@@ -1,0 +1,17 @@
+meta {
+  name: ИНН неверного формата
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/companies/lookup?inn=123
+  body: none
+  auth: none
+}
+
+tests {
+  test("HTTP 422", function () {
+    expect([422]).to.include(res.status);
+  });
+}

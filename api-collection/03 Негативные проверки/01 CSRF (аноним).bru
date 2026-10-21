@@ -1,0 +1,21 @@
+meta {
+  name: CSRF (аноним)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/auth/csrf
+  body: none
+  auth: none
+}
+
+script:post-response {
+  bru.setVar("csrf", res.body.csrf_token);
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect([200]).to.include(res.status);
+  });
+}

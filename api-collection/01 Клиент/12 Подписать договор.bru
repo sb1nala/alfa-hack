@@ -1,0 +1,37 @@
+meta {
+  name: Подписать договор
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/api/applications/{{applicationId}}/sign
+  body: json
+  auth: none
+}
+
+headers {
+  X-CSRF-Token: {{csrf}}
+}
+
+body:json {
+  {
+    "expected_revision": {{revision}},
+    "offer_id": "{{offerId}}",
+    "consent": true
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.revision) bru.setVar("revision", res.body.revision);
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect([200]).to.include(res.status);
+  });
+}
+
+docs {
+  Симуляция подписи. Затем запрос 09 покажет SIGNED → ISSUED.
+}

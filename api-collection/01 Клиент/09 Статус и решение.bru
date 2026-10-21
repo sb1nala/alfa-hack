@@ -1,0 +1,30 @@
+meta {
+  name: Статус и решение
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/applications/{{applicationId}}
+  body: none
+  auth: none
+}
+
+script:post-response {
+  if (res.body && res.body.revision) bru.setVar("revision", res.body.revision);
+  bru.setVar("status", res.body.status);
+  const offer = res.body.decision && res.body.decision.offer;
+  if (offer) bru.setVar("offerId", offer.id);
+  console.log("Статус:", res.body.status, "| ожидается:", bru.getEnvVar("expectedOutcome"));
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect([200]).to.include(res.status);
+  });
+}
+
+docs {
+  Повторяйте, пока статус не станет итоговым. Ожидаемый исход — переменная `expectedOutcome` окружения.
+  Live-обновления (SSE) Bruno не показывает — см. `docs/test-scenarios.md`, раздел про SSE.
+}

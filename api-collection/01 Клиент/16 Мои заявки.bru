@@ -1,0 +1,17 @@
+meta {
+  name: Мои заявки
+  type: http
+  seq: 16
+}
+
+get {
+  url: {{baseUrl}}/api/applications
+  body: none
+  auth: none
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect([200]).to.include(res.status);
+  });
+}

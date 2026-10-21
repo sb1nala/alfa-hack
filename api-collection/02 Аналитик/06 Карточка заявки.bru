@@ -1,0 +1,26 @@
+meta {
+  name: Карточка заявки
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/underwriter/applications/{{uwApplicationId}}
+  body: none
+  auth: none
+}
+
+script:post-response {
+  bru.setVar("uwRevision", res.body.application.revision);
+  bru.setVar("uwProductId", res.body.application.product_id);
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect([200]).to.include(res.status);
+  });
+}
+
+docs {
+  Анкета, внешние проверки, факторы скоринга, рекомендация системы.
+}

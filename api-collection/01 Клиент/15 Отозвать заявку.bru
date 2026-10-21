@@ -1,0 +1,36 @@
+meta {
+  name: Отозвать заявку
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/api/applications/{{applicationId}}/cancel
+  body: json
+  auth: none
+}
+
+headers {
+  X-CSRF-Token: {{csrf}}
+}
+
+body:json {
+  {
+    "expected_revision": {{revision}},
+    "reason": "Клиент отказался от предложения"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.revision) bru.setVar("revision", res.body.revision);
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect([200]).to.include(res.status);
+  });
+}
+
+docs {
+  Отказ от контрпредложения или отзыв до подписания → CANCELLED.
+}

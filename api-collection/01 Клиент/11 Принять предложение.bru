@@ -1,0 +1,36 @@
+meta {
+  name: Принять предложение
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/api/applications/{{applicationId}}/accept-offer
+  body: json
+  auth: none
+}
+
+headers {
+  X-CSRF-Token: {{csrf}}
+}
+
+body:json {
+  {
+    "expected_revision": {{revision}},
+    "offer_id": "{{offerId}}"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.revision) bru.setVar("revision", res.body.revision);
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect([200]).to.include(res.status);
+  });
+}
+
+docs {
+  Для APPROVED и COUNTER_OFFER.
+}
