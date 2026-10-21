@@ -687,6 +687,12 @@ def test_concurrent_lookup_has_one_identity_and_no_open_transaction_during_http(
         return await asyncio.to_thread(handler, request)
 
     for client in (actors.first, actors.second):
+        # This test performs two PostgreSQL observations inside the HTTP barrier.
+        # Give those observations their own bounded budget under Docker/CI load;
+        # the separate timeout test above still verifies the 150ms HTTP deadline.
+        monkeypatch.setattr(
+            client.app.state, "settings", actors.settings.model_copy(update={"egrul_timeout": 5})
+        )
         monkeypatch.setattr(client.app.state, "registry", registry_client(async_handler))
     with ThreadPoolExecutor(2) as executor:
         results = list(

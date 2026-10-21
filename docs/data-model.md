@@ -11,7 +11,8 @@ Auth csrf/login/me/logout, JWT, роли, CSRF/Origin и зависимости 
 B05 реализует каталог продуктов, lookup через локальный мок ЕГРЮЛ и CRUD черновиков
 с фильтрацией собственных заявок. B06 реализует submit/cancel, общий механизм переходов,
 транзакционный аудит, снимок входов, идемпотентность и очередь в PostgreSQL.
-Остальные маршруты после доступа возвращают 501; worker, файлы и SSE идут далее.
+B07 добавляет worker проверок и сохранение ответов до SCORING (см. ниже).
+Остальные маршруты после доступа возвращают 501; решения B08, файлы и SSE идут далее.
 
 Источники: [командный план](team-plan.md), [статусы](application-states.md),
 [архитектура (черновик)](architecture.md). Документы PR #31 уже находятся в `main`.
@@ -363,7 +364,7 @@ GET csrf. Все мутации проверяют точный обязател
 | `submit_idempotency` | UUID id, user_id/application_id FK, operation=submit, key UUID, request_body JSONB, response_status=202, response_body JSONB, created_at/expires_at. UNIQUE(user_id,application_id,operation,key). CHECK expires_at >= created_at +24h. |
 
 Состояния заданий: pending (ожидание или отложенный повтор), running (lease),
-completed (результат сохранён), cancelled (больше неприменимо), failed (технически
+completed (весь конвейер завершён, включая решение B08), cancelled (больше неприменимо), failed (технически
 завершён после исчерпания будущего бюджета попыток, не кредитный REJECTED).
 B06 создаёт pending и при отмене меняет pending/running на cancelled, сбрасывает
 lease. Бюджет/интервалы повторов и процесс исполнения — B07.
@@ -487,3 +488,56 @@ npm exec --yes --package=typescript@5.9.3 -- tsc --noEmit --strict --skipLibChec
 Idempotency-Key и reconnect SSE; с рисками: словари причин/документов, формат факторов,
 публичные объяснения, поля условий/ставки и версию политики. Отмена определена
 актуальным документом состояний. Этот PR не задаёт кредитных правил.
+
+
+## B07: сохранённые проверки и граница B08
+
+Миграция `b07_worker_checks` поверх B06; прежние миграции сохранены. Публичные схемы
+не меняются. Выбрана явная фаза одного задания, чтобы успех проверок атомарно оставлял
+восстанавливаемую работу B08 без нового submit и повторных вызовов источников.
+
+| Таблица/поле | Контракт |
+| --- | --- |
+| `pipeline_jobs.phase` | NOT NULL, checks (default) / decision, CHECK. Индекс phase/state/available_at/id. B07 захватывает только checks. |
+| `pipeline_jobs.last_error_stage/category` | Nullable TEXT, ограниченный внутренний код, без исключений, секретов или тел ответов. |
+| `submission_checks.submission_id` | PK и FK application_submissions.id без CASCADE: максимум один полный набор на отправку. Заявка/input_revision однозначно получаются через submission. |
+| `submission_checks.egrul/pb/bki` | Три NOT NULL JSONB оригинальных проверенных ответов, включая ИНН. Сохраняются одновременно, не обновляются при повторном исполнении. |
+| `submission_checks.schema_version/created_at` | NOT NULL integer default 1 / TIMESTAMPTZ default now(). Версия транспортного формата и время сохранения. |
+
+Попытка читает ИНН исключительно из form_snapshot. Короткий claim через SKIP LOCKED
+фиксирует новый токен/lease/attempts до HTTP. Все мутации после claim блокируют и
+перечитывают сначала заявку, затем job; проверяют application/submission/job,
+input_revision, статус SUBMITTED/CHECKING, phase=checks, running, токен и срок lease.
+После flush результатов/аудита условный UPDATE повторно проверяет срок на DB-clock;
+неудача откатывает всю транзакцию. job_applicable отдельно не даёт права записи.
+Cancel делает поздние ответы неприменимыми; смена input_revision отменяет старый job.
+Старый исполнитель не может записать результат или назначить retry даже до повторного
+захвата истёкшей lease. HTTP, backoff и polling не держат транзакций/блокировок.
+
+SUBMITTED → CHECKING выполняется один раз через общий transition; восстановление
+CHECKING не повторяет этот переход. Технический retry пишет CHECKING → CHECKING,
+revision/sequence растут, input_revision сохраняется. Частичные ответы **не сохраняются**:
+каждая попытка заново получает все три источника. Это намеренно исключает смешивание
+ответов разных попыток; после падения до commit запросы повторяются.
+
+Успех атомарно создаёт submission_checks, CHECKING → SCORING и аудит; тот же job
+получает pending/decision, attempts=0, available_at=DB-now, lease=NULL, ошибки=NULL.
+Attempts — бюджет текущей фазы; число успешной попытки checks остаётся в аудите.
+SCORING не означает завершённого кредитного решения. Повтор после commit исключён
+фазой, статусом и PK результата. completed используется только после всей фазы B08.
+
+B08 выбирает pending decision или истёкшую running decision, увеличивает свой бюджет
+и получает новую lease. Читает form_snapshot/product_snapshot/submitted_at и
+submission_checks schema_version=1; может использовать существующие EgrulReport,
+PbReport, BkiReport.from_dict без сетевых вызовов. Проверка версии политики, построение
+ApplicationInput и decide() — B08. Перед атомарной записью решения/предложения,
+перехода/аудита/completed обязательны те же блокировки/перечитывание/lease-проверки,
+но phase=decision и status=SCORING. Не сравнивать input_revision с revision состояния.
+Будущая дозагрузка данных создаёт новую отправку и атомарно инвалидирует старую.
+
+Временные network/timeout/429/5xx повторяются ограниченно. 404, неверный ИНН,
+невалидные JSON/поля — рабочее техническое failed до решения команды; заявка CHECKING,
+без REJECTED. pb.available=false с корректными nullable финансовыми полями — валидный
+ответ, сохраняется для B08. Сбой БД не считается успехом, running восстанавливается
+по lease. Полные лимиты, диагностика и операторская атомарная команда requeue с
+аудитом описаны в [backend/README.md](../backend/README.md#b07-отдельный-worker-проверок).

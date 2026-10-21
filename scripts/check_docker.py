@@ -33,7 +33,16 @@ def main() -> None:
     env["POSTGRES_USER"] = "alfa_hack"
     env["POSTGRES_PASSWORD"] = uuid4().hex
     env["MOCKS_PORT"] = str(free_port())
-    env["MOCKS_LATENCY_MS"] = "0"
+    env["MOCKS_LATENCY_MS"] = "500"
+    env.update(
+        WORKER_POLL_INTERVAL="0.1",
+        WORKER_HTTP_TIMEOUT="2",
+        WORKER_ATTEMPT_TIMEOUT="6",
+        WORKER_DB_TIMEOUT="1",
+        WORKER_LEASE_SECONDS="12",
+        WORKER_RETRY_BASE="0.2",
+        WORKER_RETRY_MAX="0.5",
+    )
     env["DB_READINESS_TIMEOUT"] = "2"
     env["AUTH_JWT_SECRET"] = secrets.token_urlsafe(48)
     env["AUTH_ALLOWED_ORIGIN"] = f"http://127.0.0.1:{env['BACKEND_PORT']}"
@@ -42,7 +51,7 @@ def main() -> None:
         "docker",
         "compose",
         "--project-name",
-        f"alfa-b06-check-{uuid4().hex[:10]}",
+        f"alfa-b07-check-{uuid4().hex[:10]}",
         "--env-file",
         str(ROOT / ".env.example"),
         "-f",
@@ -341,13 +350,208 @@ def main() -> None:
                 api_request(path + "/submit", 202, body=submit_body, token=token, key=submit_key)
                 == submitted
             )
+
+            def sql(statement):
+                result = subprocess.run(
+                    [
+                        *compose,
+                        "exec",
+                        "-T",
+                        "db",
+                        "psql",
+                        "-U",
+                        env["POSTGRES_USER"],
+                        "-d",
+                        env["POSTGRES_DB"],
+                        "-v",
+                        "ON_ERROR_STOP=1",
+                        "-Atc",
+                        statement,
+                    ],
+                    env=env,
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=10,
+                )
+                return result.stdout.strip()
+
+            def until(condition, seconds=35):
+                deadline = time.monotonic() + seconds
+                while True:
+                    value = condition()
+                    if value:
+                        return value
+                    if time.monotonic() >= deadline:
+                        raise AssertionError("Docker condition deadline exceeded")
+                    time.sleep(0.1)
+
+            def new_submission(company_record):
+                form = company_record["application"]
+                product = next(p for p in products if p["code"] == form["product_code"])
+                new_draft = api_request(
+                    "applications",
+                    201,
+                    token=token,
+                    body={
+                        "company": company_record["company"],
+                        "product_id": product["id"],
+                        **{k: v for k, v in form.items() if k != "product_code"},
+                    },
+                )
+                new_path = "applications/" + new_draft["id"]
+                sent = api_request(
+                    new_path + "/submit",
+                    202,
+                    token=token,
+                    key=uuid4(),
+                    body={
+                        "expected_revision": new_draft["revision"],
+                        "consent_to_checks": True,
+                    },
+                )
+                return new_path, sent
+
+            def at_status(new_path, status):
+                card = api_request(new_path, 200)
+                return card if card["status"] == status else None
+
+            def assert_handoff(sent, retries=0):
+                identity = sent["id"]
+                assert (
+                    sql(
+                        f"SELECT a.status, a.input_revision, a.revision, j.phase, j.state, "
+                        f"j.attempts, (j.lease_token IS NULL), "
+                        "(SELECT count(*) FROM submission_checks c "
+                        "WHERE c.submission_id=j.submission_id), "
+                        f"(SELECT count(*) FROM application_events e WHERE e.application_id=a.id "
+                        f"AND e.status='SCORING') "
+                        f"FROM applications a JOIN pipeline_jobs j ON j.application_id=a.id "
+                        f"WHERE a.id='{identity}'"
+                    )
+                    == f"SCORING|2|{4 + retries}|decision|pending|0|t|1|1"
+                )
+                # All three raw sources persist, remain internal, and share one submission.
+                assert (
+                    sql(
+                        f"SELECT c.egrul->>'inn'=c.pb->>'inn' AND c.pb->>'inn'=c.bki->>'inn' "
+                        f"FROM submission_checks c JOIN pipeline_jobs j USING(submission_id) "
+                        f"WHERE j.application_id='{identity}'"
+                    )
+                    == "t"
+                )
+
+            new_path, sent = new_submission(company_data)
+            run("up", "-d", "--scale", "worker=2", "worker")
+            until(lambda: at_status(new_path, "CHECKING"))
+            until(lambda: at_status(new_path, "SCORING"))
+            assert_handoff(sent)
+            print(
+                "PASS two real workers: CHECKING -> three stored responses -> SCORING", flush=True
+            )
+
+            records = json.loads((ROOT / "seed/companies.json").read_text())["companies"]
+            bki_company = next(c for c in records if c["client_login"] == "demo-bki")
+            new_path, bki_sent = new_submission(bki_company)
+            until(lambda: at_status(new_path, "CHECKING"))
+            until(lambda: at_status(new_path, "SCORING"))
+            assert_handoff(bki_sent, retries=2)
+            print("PASS real demo-bki: two 503, two audited retries, then handoff", flush=True)
+
+            # Graceful SIGTERM and successful commit survive process restart.
+            run("restart", "worker")
+            assert_handoff(sent)
+            assert_handoff(bki_sent, retries=2)
+            new_path, crashed = new_submission(company_data)
+            until(lambda: at_status(new_path, "CHECKING"))
+            run("kill", "-s", "SIGKILL", "worker")
+            assert (
+                sql(
+                    "SELECT count(*) FROM submission_checks c "
+                    "JOIN pipeline_jobs j USING(submission_id) "
+                    f"WHERE j.application_id='{crashed['id']}'"
+                )
+                == "0"
+            )
+            run("start", "worker")
+            until(lambda: at_status(new_path, "SCORING"))
+            assert_handoff(crashed)
+            print(
+                "PASS SIGTERM/restart and crash during HTTP recovered by expired lease", flush=True
+            )
+
+            new_path, late = new_submission(company_data)
+            current = until(lambda: at_status(new_path, "CHECKING"))
+            cancelled = api_request(
+                new_path + "/cancel",
+                200,
+                token=token,
+                body={"expected_revision": current["revision"]},
+            )
+            assert cancelled["status"] == "CANCELLED"
+
+            # Bound wait on actual worker completion in logs; do not use a fixed sleep.
+            def cancellation_observed():
+                logs = subprocess.run(
+                    [*compose, "logs", "--no-color", "worker"],
+                    env=env,
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=10,
+                )
+                return any(
+                    late["id"] in line and "category=lost_lease" in line
+                    for line in logs.stdout.splitlines()
+                )
+
+            until(cancellation_observed)
+            assert (
+                sql(
+                    f"SELECT a.status, j.state, "
+                    "(SELECT count(*) FROM submission_checks c "
+                    "WHERE c.submission_id=j.submission_id) "
+                    f"FROM applications a JOIN pipeline_jobs j ON j.application_id=a.id "
+                    f"WHERE a.id='{late['id']}'"
+                )
+                == "CANCELLED|cancelled|0"
+            )
+            print("PASS cancel during real HTTP prevents late result persistence", flush=True)
+
+            # Queue is idle: B07 never consumes pending decision jobs.
+            assert_handoff(sent)
+            assert_handoff(bki_sent, retries=2)
+            run("stop", "db")
+            until(
+                lambda: (
+                    "database_or_internal"
+                    in subprocess.run(
+                        [*compose, "logs", "--no-color", "worker"],
+                        env=env,
+                        cwd=ROOT,
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                        timeout=10,
+                    ).stdout
+                )
+            )
+            run("start", "db")
+            wait_ready()
+            new_path, recovered = new_submission(company_data)
+            until(lambda: at_status(new_path, "SCORING"))
+            assert_handoff(recovered)
+            print("PASS workers survive DB disconnect and resume processing", flush=True)
+
             auth_request("logout", 204, body={}, token=token)
             auth_request("me", 401, cookie="access_token=" + saved_jwt)
             cookies.clear()
             auth_request("csrf", 200)
             print(
                 "PASS Docker login, drafts, submit/replay, restart, cancel, "
-                "audit, queue and recovery",
+                "audit, queue, worker checks, lease and recovery",
                 flush=True,
             )
         except BaseException:
