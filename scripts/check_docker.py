@@ -81,9 +81,7 @@ def main() -> None:
                     raise
                 time.sleep(0.5)
 
-    def api_request(
-        path, expected, *, body=None, token=None, cookie=None, method=None, key=None
-    ):
+    def api_request(path, expected, *, body=None, token=None, cookie=None, method=None, key=None):
         request_headers = {"Origin": env["AUTH_ALLOWED_ORIGIN"]}
         if key:
             request_headers["Idempotency-Key"] = str(key)
@@ -113,9 +111,7 @@ def main() -> None:
             if path == "auth/login" and expected == 200:
                 assert set(result) == {"id", "login", "display_name", "role"}
                 assert all(
-                    "HttpOnly" in value
-                    and "SameSite=lax" in value
-                    and "Path=/" in value
+                    "HttpOnly" in value and "SameSite=lax" in value and "Path=/" in value
                     for value in response.headers.get_all("Set-Cookie")
                 )
             if path == "auth/logout" and expected == 204:
@@ -146,9 +142,7 @@ def main() -> None:
         if ca_file := env.get("DOCKER_BUILD_CA"):
             override_data["services"]["backend"]["build"] = {"secrets": ["proxy_ca"]}
             override_data["services"]["mocks"]["build"] = {"secrets": ["proxy_ca"]}
-            override_data["secrets"] = {
-                "proxy_ca": {"file": str(Path(ca_file).resolve())}
-            }
+            override_data["secrets"] = {"proxy_ca": {"file": str(Path(ca_file).resolve())}}
         override = staging / "check-override.json"
         override.write_text(json.dumps(override_data))
         compose.extend(["-f", str(override)])
@@ -213,15 +207,11 @@ def main() -> None:
 
             products = api_request("products", 200)["items"]
             assert len(products) == 4
-            company_data = json.loads((ROOT / "seed/companies.json").read_text())[
-                "companies"
-            ][0]
+            company_data = json.loads((ROOT / "seed/companies.json").read_text())["companies"][0]
             inn = company_data["company"]["inn"]
             company = api_request(f"companies/lookup?inn={inn}", 200)["company"]
             assert company == company_data["company"]
-            assert api_request("companies/lookup?inn=0000000000", 200) == {
-                "company": None
-            }
+            assert api_request("companies/lookup?inn=0000000000", 200) == {"company": None}
             draft = api_request("applications", 201, body={}, token=token)
             path = "applications/" + draft["id"]
             assert draft["revision"] == 1 and draft["status"] == "DRAFT"
@@ -241,13 +231,8 @@ def main() -> None:
             )
             assert edited["revision"] == 2 and edited["form"]["amount"] == "100000.01"
             assert api_request(path, 200) == edited
-            assert (
-                api_request("applications?offset=0&limit=1&status=DRAFT", 200)["total"]
-                == 1
-            )
-            api_request(
-                path, 409, method="PATCH", token=token, body={"expected_revision": 1}
-            )
+            assert api_request("applications?offset=0&limit=1&status=DRAFT", 200)["total"] == 1
+            api_request(path, 409, method="PATCH", token=token, body={"expected_revision": 1})
             submit_key = uuid4()
             submit_body = {"expected_revision": 2, "consent_to_checks": True}
             submitted = api_request(
@@ -255,9 +240,7 @@ def main() -> None:
             )
             assert submitted["status"] == "SUBMITTED" and submitted["revision"] == 3
             assert (
-                api_request(
-                    path + "/submit", 202, body=submit_body, token=token, key=submit_key
-                )
+                api_request(path + "/submit", 202, body=submit_body, token=token, key=submit_key)
                 == submitted
             )
 
@@ -342,9 +325,7 @@ def main() -> None:
             assert auth_request("csrf", 200)["csrf_token"] == token
             assert api_request(path, 200) == edited
             assert (
-                api_request(
-                    path + "/submit", 202, body=submit_body, token=token, key=submit_key
-                )
+                api_request(path + "/submit", 202, body=submit_body, token=token, key=submit_key)
                 == submitted
             )
             cancelled = api_request(
@@ -357,9 +338,7 @@ def main() -> None:
             assert cancelled["allowed_actions"] == []
             assert_database(cancelled=True)
             assert (
-                api_request(
-                    path + "/submit", 202, body=submit_body, token=token, key=submit_key
-                )
+                api_request(path + "/submit", 202, body=submit_body, token=token, key=submit_key)
                 == submitted
             )
             auth_request("logout", 204, body={}, token=token)
