@@ -1,0 +1,485 @@
+{
+  "_meta": {
+    "policy_version": "2026-10-21.draft1",
+    "as_of": "2026-10-21",
+    "owner": "Риски и данные",
+    "note": "Синтетические данные. ИНН начинаются с 00 — такого кода региона нет, совпадение с реальными компаниями исключено. Контрольные суммы ИНН корректны. Деньги — строки рублей с двумя знаками, как в API."
+  },
+  "companies": [
+    {
+      "key": "approve",
+      "scenario": "Хорошая история, стабильный денежный поток — одобрение на запрошенных условиях",
+      "client_login": "demo-approve",
+      "expected_outcome": "APPROVED",
+      "expected_after_info": null,
+      "company": {
+        "inn": "0086906651",
+        "name": "ООО «Северный хлеб»",
+        "legal_form": "OOO",
+        "registration_date": "2019-04-15",
+        "address": "г. Вологда, ул. Мельничная, д. 12",
+        "okved": "10.71"
+      },
+      "application": {
+        "product_code": "working_capital_line",
+        "purpose": "purchase_goods",
+        "amount": "5000000.00",
+        "term_months": 18,
+        "annual_revenue": "47000000.00"
+      },
+      "mocks": {
+        "egrul": {
+          "status": "ACTIVE",
+          "registration_date": "2019-04-15",
+          "okved": "10.71",
+          "address": "г. Вологда, ул. Мельничная, д. 12",
+          "director": "Смирнов Олег Петрович"
+        },
+        "pb": {
+          "available": true,
+          "revenue": "48000000.00",
+          "expenses": "40000000.00",
+          "employees": 34,
+          "tax_arrears": "0.00",
+          "mass_address": false,
+          "director_disqualified": false
+        },
+        "bki": {
+          "loans": [
+            {
+              "type": "equipment_loan",
+              "outstanding": "2400000.00",
+              "monthly_payment": "120000.00",
+              "current_overdue_days": 0
+            }
+          ],
+          "max_overdue_days_24m": 0,
+          "overdue_30_plus_count_24m": 0,
+          "inquiries_30d": 1
+        }
+      },
+      "mock_behavior": {}
+    },
+    {
+      "key": "counter_term",
+      "scenario": "Платёж на 12 мес. слишком велик для выручки — предлагаем ту же сумму на больший срок",
+      "client_login": "demo-term",
+      "expected_outcome": "COUNTER_OFFER",
+      "expected_after_info": null,
+      "company": {
+        "inn": "003766030007",
+        "name": "ИП Кузнецова Анна Сергеевна",
+        "legal_form": "IP",
+        "registration_date": "2021-02-10",
+        "address": "г. Казань, ул. Баумана, д. 40",
+        "okved": "96.02"
+      },
+      "application": {
+        "product_code": "express",
+        "purpose": "urgent_expenses",
+        "amount": "2500000.00",
+        "term_months": 12,
+        "annual_revenue": "9500000.00"
+      },
+      "mocks": {
+        "egrul": {
+          "status": "ACTIVE",
+          "registration_date": "2021-02-10",
+          "okved": "96.02",
+          "address": "г. Казань, ул. Баумана, д. 40",
+          "director": "Кузнецова Анна Сергеевна"
+        },
+        "pb": {
+          "available": true,
+          "revenue": "9200000.00",
+          "expenses": "7000000.00",
+          "employees": 6,
+          "tax_arrears": "0.00",
+          "mass_address": false,
+          "director_disqualified": false
+        },
+        "bki": {
+          "loans": [],
+          "max_overdue_days_24m": 0,
+          "overdue_30_plus_count_24m": 0,
+          "inquiries_30d": 0
+        }
+      },
+      "mock_behavior": {}
+    },
+    {
+      "key": "counter_amount",
+      "scenario": "Сумма не по силам денежному потоку даже на максимальный срок — предлагаем меньшую сумму",
+      "client_login": "demo-amount",
+      "expected_outcome": "COUNTER_OFFER",
+      "expected_after_info": null,
+      "company": {
+        "inn": "0099017610",
+        "name": "ООО «ТехноСклад»",
+        "legal_form": "OOO",
+        "registration_date": "2018-09-03",
+        "address": "г. Екатеринбург, ул. Складская, д. 5",
+        "okved": "46.69"
+      },
+      "application": {
+        "product_code": "working_capital_line",
+        "purpose": "purchase_goods",
+        "amount": "12000000.00",
+        "term_months": 12,
+        "annual_revenue": "38000000.00"
+      },
+      "mocks": {
+        "egrul": {
+          "status": "ACTIVE",
+          "registration_date": "2018-09-03",
+          "okved": "46.69",
+          "address": "г. Екатеринбург, ул. Складская, д. 5",
+          "director": "Орлов Виктор Андреевич"
+        },
+        "pb": {
+          "available": true,
+          "revenue": "38000000.00",
+          "expenses": "33000000.00",
+          "employees": 21,
+          "tax_arrears": "0.00",
+          "mass_address": false,
+          "director_disqualified": false
+        },
+        "bki": {
+          "loans": [
+            {
+              "type": "working_capital",
+              "outstanding": "3000000.00",
+              "monthly_payment": "150000.00",
+              "current_overdue_days": 0
+            }
+          ],
+          "max_overdue_days_24m": 0,
+          "overdue_30_plus_count_24m": 0,
+          "inquiries_30d": 2
+        }
+      },
+      "mock_behavior": {}
+    },
+    {
+      "key": "counter_product",
+      "scenario": "Экспресс-кредит без залога не проходит по платежу — предлагаем инвестиционный кредит под залог на ту же сумму",
+      "client_login": "demo-product",
+      "expected_outcome": "COUNTER_OFFER",
+      "expected_after_info": null,
+      "company": {
+        "inn": "0014422210",
+        "name": "ООО «Автосервис Плюс»",
+        "legal_form": "OOO",
+        "registration_date": "2020-06-18",
+        "address": "г. Самара, Московское ш., д. 77",
+        "okved": "45.20"
+      },
+      "application": {
+        "product_code": "express",
+        "purpose": "buy_equipment",
+        "amount": "5000000.00",
+        "term_months": 36,
+        "annual_revenue": "30000000.00"
+      },
+      "mocks": {
+        "egrul": {
+          "status": "ACTIVE",
+          "registration_date": "2020-06-18",
+          "okved": "45.20",
+          "address": "г. Самара, Московское ш., д. 77",
+          "director": "Белов Игорь Николаевич"
+        },
+        "pb": {
+          "available": true,
+          "revenue": "30000000.00",
+          "expenses": "26000000.00",
+          "employees": 15,
+          "tax_arrears": "0.00",
+          "mass_address": false,
+          "director_disqualified": false
+        },
+        "bki": {
+          "loans": [
+            {
+              "type": "car_loan",
+              "outstanding": "1500000.00",
+              "monthly_payment": "100000.00",
+              "current_overdue_days": 0
+            }
+          ],
+          "max_overdue_days_24m": 0,
+          "overdue_30_plus_count_24m": 0,
+          "inquiries_30d": 1
+        }
+      },
+      "mock_behavior": {}
+    },
+    {
+      "key": "needs_info",
+      "scenario": "Выручка в анкете (18 млн) вдвое выше данных ФНС (9 млн) — просим уточнить выручку и выписку",
+      "client_login": "demo-info",
+      "expected_outcome": "NEEDS_INFO",
+      "expected_after_info": {
+        "change": {
+          "annual_revenue": "9400000.00"
+        },
+        "outcome": "APPROVED"
+      },
+      "company": {
+        "inn": "000104250982",
+        "name": "ИП Морозов Илья Дмитриевич",
+        "legal_form": "IP",
+        "registration_date": "2024-03-01",
+        "address": "г. Новосибирск, ул. Кирова, д. 3",
+        "okved": "62.01"
+      },
+      "application": {
+        "product_code": "express",
+        "purpose": "other",
+        "amount": "3000000.00",
+        "term_months": 24,
+        "annual_revenue": "18000000.00"
+      },
+      "mocks": {
+        "egrul": {
+          "status": "ACTIVE",
+          "registration_date": "2024-03-01",
+          "okved": "62.01",
+          "address": "г. Новосибирск, ул. Кирова, д. 3",
+          "director": "Морозов Илья Дмитриевич"
+        },
+        "pb": {
+          "available": true,
+          "revenue": "9000000.00",
+          "expenses": "6000000.00",
+          "employees": 4,
+          "tax_arrears": "0.00",
+          "mass_address": false,
+          "director_disqualified": false
+        },
+        "bki": {
+          "loans": [],
+          "max_overdue_days_24m": 0,
+          "overdue_30_plus_count_24m": 0,
+          "inquiries_30d": 1
+        }
+      },
+      "mock_behavior": {}
+    },
+    {
+      "key": "manual",
+      "scenario": "Серая зона: строительство, разовая просрочка 45 дней, много запросов в БКИ — решает аналитик",
+      "client_login": "demo-manual",
+      "expected_outcome": "MANUAL_REVIEW",
+      "expected_after_info": null,
+      "company": {
+        "inn": "0085481212",
+        "name": "ООО «СтройМонтаж»",
+        "legal_form": "OOO",
+        "registration_date": "2022-05-20",
+        "address": "г. Краснодар, ул. Северная, д. 210",
+        "okved": "43.21"
+      },
+      "application": {
+        "product_code": "working_capital_line",
+        "purpose": "purchase_goods",
+        "amount": "8000000.00",
+        "term_months": 24,
+        "annual_revenue": "60000000.00"
+      },
+      "mocks": {
+        "egrul": {
+          "status": "ACTIVE",
+          "registration_date": "2022-05-20",
+          "okved": "43.21",
+          "address": "г. Краснодар, ул. Северная, д. 210",
+          "director": "Ткаченко Павел Олегович"
+        },
+        "pb": {
+          "available": true,
+          "revenue": "60000000.00",
+          "expenses": "51000000.00",
+          "employees": 48,
+          "tax_arrears": "80000.00",
+          "mass_address": false,
+          "director_disqualified": false
+        },
+        "bki": {
+          "loans": [
+            {
+              "type": "working_capital",
+              "outstanding": "6000000.00",
+              "monthly_payment": "290000.00",
+              "current_overdue_days": 0
+            }
+          ],
+          "max_overdue_days_24m": 45,
+          "overdue_30_plus_count_24m": 1,
+          "inquiries_30d": 6
+        }
+      },
+      "mock_behavior": {}
+    },
+    {
+      "key": "reject_stop",
+      "scenario": "Стоп-фактор: компания в процессе ликвидации по ЕГРЮЛ — отказ без скоринга",
+      "client_login": "demo-stop",
+      "expected_outcome": "REJECTED",
+      "expected_after_info": null,
+      "company": {
+        "inn": "0047119393",
+        "name": "ООО «Ромашка-Трейд»",
+        "legal_form": "OOO",
+        "registration_date": "2017-11-02",
+        "address": "г. Тверь, пр. Чайковского, д. 19",
+        "okved": "47.19"
+      },
+      "application": {
+        "product_code": "express",
+        "purpose": "urgent_expenses",
+        "amount": "1000000.00",
+        "term_months": 12,
+        "annual_revenue": "25000000.00"
+      },
+      "mocks": {
+        "egrul": {
+          "status": "LIQUIDATING",
+          "registration_date": "2017-11-02",
+          "okved": "47.19",
+          "address": "г. Тверь, пр. Чайковского, д. 19",
+          "director": "Зайцев Роман Ильич"
+        },
+        "pb": {
+          "available": true,
+          "revenue": "24000000.00",
+          "expenses": "21000000.00",
+          "employees": 9,
+          "tax_arrears": "0.00",
+          "mass_address": false,
+          "director_disqualified": false
+        },
+        "bki": {
+          "loans": [],
+          "max_overdue_days_24m": 0,
+          "overdue_30_plus_count_24m": 0,
+          "inquiries_30d": 0
+        }
+      },
+      "mock_behavior": {}
+    },
+    {
+      "key": "reject_score",
+      "scenario": "Высокий риск по совокупности: общепит, две просрочки 30+, налоговый долг, кредитный голод — класс E",
+      "client_login": "demo-risk",
+      "expected_outcome": "REJECTED",
+      "expected_after_info": null,
+      "company": {
+        "inn": "0061663020",
+        "name": "ООО «Вкусная точка»",
+        "legal_form": "OOO",
+        "registration_date": "2023-01-16",
+        "address": "г. Ростов-на-Дону, ул. Садовая, д. 88",
+        "okved": "56.10"
+      },
+      "application": {
+        "product_code": "express",
+        "purpose": "urgent_expenses",
+        "amount": "2000000.00",
+        "term_months": 12,
+        "annual_revenue": "11000000.00"
+      },
+      "mocks": {
+        "egrul": {
+          "status": "ACTIVE",
+          "registration_date": "2023-01-16",
+          "okved": "56.10",
+          "address": "г. Ростов-на-Дону, ул. Садовая, д. 88",
+          "director": "Григорьева Елена Викторовна"
+        },
+        "pb": {
+          "available": true,
+          "revenue": "10500000.00",
+          "expenses": "9800000.00",
+          "employees": 12,
+          "tax_arrears": "150000.00",
+          "mass_address": false,
+          "director_disqualified": false
+        },
+        "bki": {
+          "loans": [
+            {
+              "type": "express",
+              "outstanding": "900000.00",
+              "monthly_payment": "95000.00",
+              "current_overdue_days": 20
+            }
+          ],
+          "max_overdue_days_24m": 60,
+          "overdue_30_plus_count_24m": 2,
+          "inquiries_30d": 7
+        }
+      },
+      "mock_behavior": {}
+    },
+    {
+      "key": "bki_failure",
+      "scenario": "БКИ первые 2 запроса отвечает ошибкой 503 — заявка остаётся в CHECKING, worker повторяет, затем одобрение",
+      "client_login": "demo-bki",
+      "expected_outcome": "APPROVED",
+      "expected_after_info": null,
+      "company": {
+        "inn": "005849901413",
+        "name": "ИП Соколов Денис Андреевич",
+        "legal_form": "IP",
+        "registration_date": "2016-07-25",
+        "address": "г. Нижний Новгород, ул. Заводская, д. 14",
+        "okved": "49.41"
+      },
+      "application": {
+        "product_code": "express",
+        "purpose": "urgent_expenses",
+        "amount": "1500000.00",
+        "term_months": 24,
+        "annual_revenue": "21000000.00"
+      },
+      "mocks": {
+        "egrul": {
+          "status": "ACTIVE",
+          "registration_date": "2016-07-25",
+          "okved": "49.41",
+          "address": "г. Нижний Новгород, ул. Заводская, д. 14",
+          "director": "Соколов Денис Андреевич"
+        },
+        "pb": {
+          "available": true,
+          "revenue": "20000000.00",
+          "expenses": "16500000.00",
+          "employees": 8,
+          "tax_arrears": "0.00",
+          "mass_address": false,
+          "director_disqualified": false
+        },
+        "bki": {
+          "loans": [
+            {
+              "type": "truck_leasing",
+              "outstanding": "1200000.00",
+              "monthly_payment": "70000.00",
+              "current_overdue_days": 0
+            }
+          ],
+          "max_overdue_days_24m": 0,
+          "overdue_30_plus_count_24m": 0,
+          "inquiries_30d": 1
+        }
+      },
+      "mock_behavior": {
+        "bki": {
+          "fail_first_n": 2,
+          "status_code": 503
+        }
+      }
+    }
+  ]
+}
