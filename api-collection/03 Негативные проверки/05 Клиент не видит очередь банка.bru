@@ -1,0 +1,17 @@
+meta {
+  name: Клиент не видит очередь банка
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/underwriter/applications
+  body: none
+  auth: none
+}
+
+tests {
+  test("HTTP 403", function () {
+    expect([403]).to.include(res.status);
+  });
+}

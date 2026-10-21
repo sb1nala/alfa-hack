@@ -1,0 +1,40 @@
+meta {
+  name: Решение — одобрить
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/underwriter/applications/{{uwApplicationId}}/decision
+  body: json
+  auth: none
+}
+
+headers {
+  X-CSRF-Token: {{csrf}}
+}
+
+body:json {
+  {
+    "expected_revision": {{uwRevision}},
+    "outcome": "APPROVED",
+    "reasons": [],
+    "offer_terms": {
+      "product_id": "{{uwProductId}}",
+      "amount": "8000000.00",
+      "term_months": 24
+    },
+    "explanation": "Мы готовы выдать кредит на запрошенных условиях.",
+    "analytical_explanation": "Просрочка 45 дней погашена, обороты стабильны; риск отрасли принят."
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect([200]).to.include(res.status);
+  });
+}
+
+docs {
+  Выполните одно из четырёх решений. Клиент увидит его по SSE.
+}

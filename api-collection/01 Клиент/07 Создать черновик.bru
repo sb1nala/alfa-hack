@@ -1,0 +1,41 @@
+meta {
+  name: Создать черновик
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/applications
+  body: json
+  auth: none
+}
+
+headers {
+  X-CSRF-Token: {{csrf}}
+}
+
+body:json {
+  {}
+}
+
+script:pre-request {
+  req.setBody({
+    product_id: bru.getVar("productId"),
+    purpose: bru.getEnvVar("purpose"),
+    amount: bru.getEnvVar("amount"),
+    term_months: Number(bru.getEnvVar("termMonths")),
+    annual_revenue: bru.getEnvVar("annualRevenue"),
+    company: JSON.parse(bru.getVar("companyJson") || "null")
+  });
+}
+
+script:post-response {
+  bru.setVar("applicationId", res.body.id);
+  if (res.body && res.body.revision) bru.setVar("revision", res.body.revision);
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect([201]).to.include(res.status);
+  });
+}

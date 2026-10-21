@@ -1,0 +1,10 @@
+{
+  "version": "1",
+  "name": "Кредитный кабинет — Alfa Hack",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git",
+    "generate.py"
+  ]
+}

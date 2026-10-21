@@ -1,0 +1,36 @@
+meta {
+  name: Загрузить документ
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/api/applications/{{applicationId}}/documents
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  X-CSRF-Token: {{csrf}}
+}
+
+body:multipart-form {
+  document_type: bank_statement_12m
+  expected_revision: {{revision}}
+  file: @file(fixtures/bank-statement-demo.pdf)
+}
+
+script:post-response {
+  if (res.body && res.body.id) bru.setVar("documentId", res.body.id);
+  if (res.body && res.body.revision) bru.setVar("revision", res.body.revision);
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect([201]).to.include(res.status);
+  });
+}
+
+docs {
+  Для NEEDS_INFO (demo-info).
+}

@@ -1,0 +1,21 @@
+meta {
+  name: Выход
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/api/auth/logout
+  body: none
+  auth: none
+}
+
+headers {
+  X-CSRF-Token: {{csrf}}
+}
+
+tests {
+  test("HTTP 204", function () {
+    expect([204]).to.include(res.status);
+  });
+}

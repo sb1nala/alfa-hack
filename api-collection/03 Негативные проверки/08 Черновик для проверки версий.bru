@@ -1,0 +1,29 @@
+meta {
+  name: Черновик для проверки версий
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/applications
+  body: json
+  auth: none
+}
+
+headers {
+  X-CSRF-Token: {{csrf}}
+}
+
+body:json {
+  {}
+}
+
+script:post-response {
+  bru.setVar("negApplicationId", res.body.id);
+}
+
+tests {
+  test("HTTP 201", function () {
+    expect([201]).to.include(res.status);
+  });
+}

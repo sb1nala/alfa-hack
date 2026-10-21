@@ -1,0 +1,42 @@
+meta {
+  name: Решение — запросить данные
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/underwriter/applications/{{uwApplicationId}}/decision
+  body: json
+  auth: none
+}
+
+headers {
+  X-CSRF-Token: {{csrf}}
+}
+
+body:json {
+  {
+    "expected_revision": {{uwRevision}},
+    "outcome": "NEEDS_INFO",
+    "reasons": [],
+    "required_documents": [
+      {
+        "code": "financial_statements",
+        "title": "Бухгалтерская отчётность за последний год",
+        "explanation": "Баланс и отчёт о финансовых результатах — чтобы оценить финансовое положение компании."
+      }
+    ],
+    "explanation": "Чтобы принять решение, нам нужна отчётность компании.",
+    "analytical_explanation": "Нужна отчётность для оценки долговой нагрузки."
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect([200]).to.include(res.status);
+  });
+}
+
+docs {
+  Выполните одно из четырёх решений. Клиент увидит его по SSE.
+}

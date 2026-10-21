@@ -1,0 +1,17 @@
+meta {
+  name: Без входа
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/api/applications
+  body: none
+  auth: none
+}
+
+tests {
+  test("HTTP 401", function () {
+    expect([401]).to.include(res.status);
+  });
+}

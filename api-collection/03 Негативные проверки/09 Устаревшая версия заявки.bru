@@ -1,0 +1,32 @@
+meta {
+  name: Устаревшая версия заявки
+  type: http
+  seq: 9
+}
+
+patch {
+  url: {{baseUrl}}/api/applications/{{negApplicationId}}
+  body: json
+  auth: none
+}
+
+headers {
+  X-CSRF-Token: {{csrf}}
+}
+
+body:json {
+  {
+    "expected_revision": 999,
+    "term_months": 12
+  }
+}
+
+tests {
+  test("HTTP 409", function () {
+    expect([409]).to.include(res.status);
+  });
+}
+
+docs {
+  Защита от одновременного редактирования: ожидаем 409 и текст errors.conflict.
+}

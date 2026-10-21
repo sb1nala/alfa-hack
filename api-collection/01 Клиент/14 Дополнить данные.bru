@@ -1,0 +1,38 @@
+meta {
+  name: Дополнить данные
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/api/applications/{{applicationId}}/additional-info
+  body: json
+  auth: none
+}
+
+headers {
+  X-CSRF-Token: {{csrf}}
+}
+
+body:json {
+  {
+    "expected_revision": {{revision}},
+    "annual_revenue": "{{correctedRevenue}}",
+    "comment": "Уточнила выручку по данным бухгалтерии",
+    "document_ids": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.revision) bru.setVar("revision", res.body.revision);
+}
+
+tests {
+  test("HTTP 202", function () {
+    expect([202]).to.include(res.status);
+  });
+}
+
+docs {
+  demo-info: выручка 9 400 000 ₽ → заявка уходит на повторную проверку и одобряется.
+}

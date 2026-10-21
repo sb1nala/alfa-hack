@@ -1,0 +1,21 @@
+meta {
+  name: История заявки
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/api/applications/{{applicationId}}/history
+  body: none
+  auth: none
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect([200]).to.include(res.status);
+  });
+}
+
+docs {
+  Аудит: каждый переход статуса — отдельное событие.
+}

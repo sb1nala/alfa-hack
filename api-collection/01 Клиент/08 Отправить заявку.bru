@@ -1,0 +1,40 @@
+meta {
+  name: Отправить заявку
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/applications/{{applicationId}}/submit
+  body: json
+  auth: none
+}
+
+headers {
+  X-CSRF-Token: {{csrf}}
+}
+
+body:json {
+  {
+    "expected_revision": {{revision}},
+    "consent_to_checks": true
+  }
+}
+
+script:pre-request {
+  const uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+  req.setHeader("Idempotency-Key", uuid());
+}
+
+script:post-response {
+  if (res.body && res.body.revision) bru.setVar("revision", res.body.revision);
+}
+
+tests {
+  test("HTTP 202", function () {
+    expect([202]).to.include(res.status);
+  });
+}

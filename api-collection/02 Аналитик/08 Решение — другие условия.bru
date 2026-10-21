@@ -1,0 +1,45 @@
+meta {
+  name: Решение — другие условия
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/underwriter/applications/{{uwApplicationId}}/decision
+  body: json
+  auth: none
+}
+
+headers {
+  X-CSRF-Token: {{csrf}}
+}
+
+body:json {
+  {
+    "expected_revision": {{uwRevision}},
+    "outcome": "COUNTER_OFFER",
+    "reasons": [
+      {
+        "code": "amount_reduced",
+        "message": "Мы можем выдать меньшую сумму — так ежемесячный платёж будет посильным при Вашей выручке."
+      }
+    ],
+    "offer_terms": {
+      "product_id": "{{uwProductId}}",
+      "amount": "5000000.00",
+      "term_months": 24
+    },
+    "explanation": "Готовы выдать 5 млн ₽ на 24 месяца.",
+    "analytical_explanation": "Класс D, строительство: снижаем лимит до 5 млн."
+  }
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect([200]).to.include(res.status);
+  });
+}
+
+docs {
+  Выполните одно из четырёх решений. Клиент увидит его по SSE.
+}

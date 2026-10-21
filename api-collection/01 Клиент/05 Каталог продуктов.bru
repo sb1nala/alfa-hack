@@ -1,0 +1,22 @@
+meta {
+  name: Каталог продуктов
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/products
+  body: none
+  auth: none
+}
+
+script:post-response {
+  const p = res.body.items.find(x => x.code === bru.getEnvVar("productCode"));
+  if (p) bru.setVar("productId", p.id);
+}
+
+tests {
+  test("HTTP 200", function () {
+    expect([200]).to.include(res.status);
+  });
+}
