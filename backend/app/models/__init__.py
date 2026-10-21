@@ -104,6 +104,7 @@ class Application(Identity, CreatedAt, Base):
         CheckConstraint("term_months > 0", name="term_positive"),
         CheckConstraint("annual_revenue >= 0", name="revenue_nonnegative"),
         CheckConstraint("revision > 0", name="revision_positive"),
+        CheckConstraint("input_revision > 0 AND input_revision <= revision", name="input_revision"),
         # Named, separately added FKs break the applications -> history -> applications cycle.
         ForeignKeyConstraint(
             ["id", "current_decision_id"],
@@ -132,6 +133,7 @@ class Application(Identity, CreatedAt, Base):
     annual_revenue: Mapped[Decimal | None]
     status: Mapped[str] = mapped_column(status_type(), server_default=text("'DRAFT'"))
     revision: Mapped[int] = mapped_column(server_default=text("1"))
+    input_revision: Mapped[int | None]
     current_decision_id: Mapped[UUID | None] = mapped_column(index=True)
     accepted_offer_id: Mapped[UUID | None] = mapped_column(index=True)
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -291,4 +293,74 @@ class CSRFContext(CreatedAt, Base):
 
     cookie_digest: Mapped[str] = mapped_column(primary_key=True)
     session_id: Mapped[UUID | None] = mapped_column(ForeignKey("auth_sessions.id"), index=True)
+    expires_at: Mapped[datetime] = mapped_column(index=True)
+
+
+class ApplicationSubmission(Identity, Base):
+    """Immutable input version; status transitions do not change input_revision."""
+
+    __tablename__ = "application_submissions"
+    __table_args__ = (
+        UniqueConstraint("application_id", "input_revision", name="uq_submissions_input_revision"),
+        UniqueConstraint("application_id", "id", name="uq_submissions_application_id"),
+        CheckConstraint("input_revision > 0", name="input_revision_positive"),
+        CheckConstraint("consent_to_checks", name="consent_required"),
+    )
+
+    application_id: Mapped[UUID] = mapped_column(ForeignKey("applications.id"))
+    input_revision: Mapped[int]
+    form_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    product_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    consent_to_checks: Mapped[bool]
+    submitted_at: Mapped[datetime]
+
+
+class PipelineJob(Identity, CreatedAt, Base):
+    __tablename__ = "pipeline_jobs"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["application_id", "submission_id"],
+            ["application_submissions.application_id", "application_submissions.id"],
+            name="fk_pipeline_jobs_submission",
+        ),
+        UniqueConstraint("submission_id", "kind"),
+        CheckConstraint("attempts >= 0", name="attempts_nonnegative"),
+        CheckConstraint(
+            "(state = 'running' AND lease_token IS NOT NULL AND lease_expires_at IS NOT NULL) "
+            "OR (state <> 'running' AND lease_token IS NULL AND lease_expires_at IS NULL)",
+            name="lease_state",
+        ),
+        Index("ix_pipeline_jobs_ready", "state", "available_at", "id"),
+        Index("ix_pipeline_jobs_application", "application_id"),
+        Index("ix_pipeline_jobs_lease", "state", "lease_expires_at"),
+    )
+
+    application_id: Mapped[UUID] = mapped_column(ForeignKey("applications.id"))
+    submission_id: Mapped[UUID]
+    kind: Mapped[str] = mapped_column(api_enum("job_kind", "application_pipeline"))
+    state: Mapped[str] = mapped_column(
+        api_enum("job_state", "pending", "running", "completed", "cancelled", "failed"),
+        server_default=text("'pending'"),
+    )
+    available_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    attempts: Mapped[int] = mapped_column(server_default=text("0"))
+    lease_token: Mapped[UUID | None]
+    lease_expires_at: Mapped[datetime | None]
+
+
+class SubmitIdempotency(Identity, CreatedAt, Base):
+    __tablename__ = "submit_idempotency"
+    __table_args__ = (
+        UniqueConstraint("user_id", "application_id", "operation", "key"),
+        CheckConstraint("response_status = 202", name="successful_status"),
+        CheckConstraint("expires_at >= created_at + interval '24 hours'", name="retention"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    application_id: Mapped[UUID] = mapped_column(ForeignKey("applications.id"))
+    operation: Mapped[str] = mapped_column(api_enum("idempotency_operation", "submit"))
+    key: Mapped[UUID]
+    request_body: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    response_status: Mapped[int]
+    response_body: Mapped[dict[str, Any]] = mapped_column(JSONB)
     expires_at: Mapped[datetime] = mapped_column(index=True)

@@ -42,7 +42,7 @@ def main() -> None:
         "docker",
         "compose",
         "--project-name",
-        f"alfa-b05-check-{uuid4().hex[:10]}",
+        f"alfa-b06-check-{uuid4().hex[:10]}",
         "--env-file",
         str(ROOT / ".env.example"),
         "-f",
@@ -81,8 +81,12 @@ def main() -> None:
                     raise
                 time.sleep(0.5)
 
-    def api_request(path, expected, *, body=None, token=None, cookie=None, method=None):
+    def api_request(
+        path, expected, *, body=None, token=None, cookie=None, method=None, key=None
+    ):
         request_headers = {"Origin": env["AUTH_ALLOWED_ORIGIN"]}
+        if key:
+            request_headers["Idempotency-Key"] = str(key)
         if token:
             request_headers["X-CSRF-Token"] = token
         if cookie:
@@ -109,7 +113,9 @@ def main() -> None:
             if path == "auth/login" and expected == 200:
                 assert set(result) == {"id", "login", "display_name", "role"}
                 assert all(
-                    "HttpOnly" in value and "SameSite=lax" in value and "Path=/" in value
+                    "HttpOnly" in value
+                    and "SameSite=lax" in value
+                    and "Path=/" in value
                     for value in response.headers.get_all("Set-Cookie")
                 )
             if path == "auth/logout" and expected == 204:
@@ -140,7 +146,9 @@ def main() -> None:
         if ca_file := env.get("DOCKER_BUILD_CA"):
             override_data["services"]["backend"]["build"] = {"secrets": ["proxy_ca"]}
             override_data["services"]["mocks"]["build"] = {"secrets": ["proxy_ca"]}
-            override_data["secrets"] = {"proxy_ca": {"file": str(Path(ca_file).resolve())}}
+            override_data["secrets"] = {
+                "proxy_ca": {"file": str(Path(ca_file).resolve())}
+            }
         override = staging / "check-override.json"
         override.write_text(json.dumps(override_data))
         compose.extend(["-f", str(override)])
@@ -205,11 +213,15 @@ def main() -> None:
 
             products = api_request("products", 200)["items"]
             assert len(products) == 4
-            company_data = json.loads((ROOT / "seed/companies.json").read_text())["companies"][0]
+            company_data = json.loads((ROOT / "seed/companies.json").read_text())[
+                "companies"
+            ][0]
             inn = company_data["company"]["inn"]
             company = api_request(f"companies/lookup?inn={inn}", 200)["company"]
             assert company == company_data["company"]
-            assert api_request("companies/lookup?inn=0000000000", 200) == {"company": None}
+            assert api_request("companies/lookup?inn=0000000000", 200) == {
+                "company": None
+            }
             draft = api_request("applications", 201, body={}, token=token)
             path = "applications/" + draft["id"]
             assert draft["revision"] == 1 and draft["status"] == "DRAFT"
@@ -223,13 +235,75 @@ def main() -> None:
                     "company": company,
                     "product_id": products[0]["id"],
                     "amount": "100000.01",
+                    "term_months": 12,
                     "purpose": "Пополнение оборотных средств",
                 },
             )
             assert edited["revision"] == 2 and edited["form"]["amount"] == "100000.01"
             assert api_request(path, 200) == edited
-            assert api_request("applications?offset=0&limit=1&status=DRAFT", 200)["total"] == 1
-            api_request(path, 409, method="PATCH", token=token, body={"expected_revision": 1})
+            assert (
+                api_request("applications?offset=0&limit=1&status=DRAFT", 200)["total"]
+                == 1
+            )
+            api_request(
+                path, 409, method="PATCH", token=token, body={"expected_revision": 1}
+            )
+            submit_key = uuid4()
+            submit_body = {"expected_revision": 2, "consent_to_checks": True}
+            submitted = api_request(
+                path + "/submit", 202, body=submit_body, token=token, key=submit_key
+            )
+            assert submitted["status"] == "SUBMITTED" and submitted["revision"] == 3
+            assert (
+                api_request(
+                    path + "/submit", 202, body=submit_body, token=token, key=submit_key
+                )
+                == submitted
+            )
+
+            def assert_database(cancelled=False):
+                application_id = draft["id"]
+                expected = (
+                    "CANCELLED|4|3|1|1|cancelled|1|1,2,3,4"
+                    if cancelled
+                    else ("SUBMITTED|3|3|1|1|pending|1|1,2,3")
+                )
+                sql = f"""SELECT a.status, a.revision, a.input_revision,
+                    (SELECT count(*) FROM application_submissions WHERE application_id=a.id),
+                    (SELECT count(*) FROM pipeline_jobs WHERE application_id=a.id),
+                    (SELECT state FROM pipeline_jobs WHERE application_id=a.id),
+                    (SELECT count(*) FROM submit_idempotency WHERE application_id=a.id),
+                    (SELECT string_agg(sequence::text, ',' ORDER BY sequence)
+                     FROM application_events WHERE application_id=a.id)
+                    FROM applications a WHERE a.id='{application_id}'"""
+                result = subprocess.run(
+                    [
+                        *compose,
+                        "exec",
+                        "-T",
+                        "db",
+                        "psql",
+                        "-U",
+                        env["POSTGRES_USER"],
+                        "-d",
+                        env["POSTGRES_DB"],
+                        "-Atc",
+                        sql,
+                    ],
+                    env=env,
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                assert result.stdout.strip() == expected, result.stdout
+                print(
+                    "PASS transactional audit, input version, idempotency and single job",
+                    flush=True,
+                )
+
+            assert_database()
+            edited = submitted
             run("stop", "mocks")
             api_request(f"companies/lookup?inn={inn}", 500)
             assert api_request(path, 200) == edited
@@ -267,12 +341,34 @@ def main() -> None:
             assert auth_request("me", 200) == user
             assert auth_request("csrf", 200)["csrf_token"] == token
             assert api_request(path, 200) == edited
+            assert (
+                api_request(
+                    path + "/submit", 202, body=submit_body, token=token, key=submit_key
+                )
+                == submitted
+            )
+            cancelled = api_request(
+                path + "/cancel",
+                200,
+                token=token,
+                body={"expected_revision": 3, "reason": "Проверка отмены"},
+            )
+            assert cancelled["status"] == "CANCELLED" and cancelled["revision"] == 4
+            assert cancelled["allowed_actions"] == []
+            assert_database(cancelled=True)
+            assert (
+                api_request(
+                    path + "/submit", 202, body=submit_body, token=token, key=submit_key
+                )
+                == submitted
+            )
             auth_request("logout", 204, body={}, token=token)
             auth_request("me", 401, cookie="access_token=" + saved_jwt)
             cookies.clear()
             auth_request("csrf", 200)
             print(
-                "PASS Docker login, products, registry, drafts, restart, seed and outage recovery",
+                "PASS Docker login, drafts, submit/replay, restart, cancel, "
+                "audit, queue and recovery",
                 flush=True,
             )
         except BaseException:

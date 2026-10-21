@@ -20,7 +20,7 @@ from sqlalchemy import func, select, text, update
 from sqlalchemy.exc import DBAPIError
 from test_auth_postgres import ORIGIN, SECRET, csrf, headers, in_database, login
 
-from app.database import create_session_factory
+from app.database import create_engine, create_session_factory
 from app.main import create_app
 from app.models import Application, ApplicationEvent, Company, Decision, Offer, Product, User
 from app.security import password_hasher
@@ -656,19 +656,29 @@ def test_concurrent_lookup_has_one_identity_and_no_open_transaction_during_http(
         # The application auth transaction must have ended before reaching the source.
         barrier.wait(timeout=5)
 
-        async def active(db):
-            return await db.scalar(
-                select(func.count())
-                .select_from(text("pg_stat_activity"))
-                .where(
-                    text(
-                        "datname = current_database() AND pid <> pg_backend_pid() "
-                        "AND state = 'idle in transaction'"
+        async def active():
+            # Observers must not create idle transactions seen by each other.
+            engine = create_engine(actors.settings)
+            try:
+                async with engine.connect() as connection:
+                    connection = await connection.execution_options(isolation_level="AUTOCOMMIT")
+                    return await connection.scalar(
+                        select(func.count())
+                        .select_from(text("pg_stat_activity"))
+                        .where(
+                            text(
+                                "datname = current_database() AND pid <> pg_backend_pid() "
+                                "AND state = 'idle in transaction'"
+                            )
+                        )
                     )
-                )
-            )
+            finally:
+                await engine.dispose()
 
-        assert in_database(actors.settings, active) == 0
+        assert asyncio.run(active()) == 0
+        # Keep both requests in HTTP until both observations finish; otherwise
+        # one request's valid post-HTTP UPSERT can race the other's observation.
+        barrier.wait(timeout=5)
         return httpx.Response(200, json={**company, "director": "Internal", "status": "ACTIVE"})
 
     # MockTransport executes synchronous handlers on the caller loop; keep DB inspection in
