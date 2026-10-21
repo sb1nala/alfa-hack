@@ -7,6 +7,7 @@ from fastapi import APIRouter, Header, Response
 from app.api import examples as ex
 from app.api.applications import ApplicationID
 from app.api.contract import endpoint, not_implemented
+from app.dependencies import accessible_application
 
 router = APIRouter(prefix="/api/applications", tags=["events"])
 SSE_DESCRIPTION = """
@@ -66,7 +67,9 @@ for index, event_type in enumerate(
         + json.dumps(frame["data"], ensure_ascii=False, separators=(",", ":"))
         + "\n\n"
     )
-stream_contract = endpoint(None, {}, SSE_DESCRIPTION, role="both", extra_errors=(410,))
+stream_contract = endpoint(
+    None, {}, SSE_DESCRIPTION, role="both", extra_errors=(410,), access=accessible_application
+)
 stream_contract["responses"][200].update(
     {
         "headers": {

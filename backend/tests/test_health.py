@@ -11,6 +11,7 @@ def client():
     # A closed loopback port exercises the real asyncpg connection failure path.
     settings = Settings(
         _env_file=None,
+        auth_jwt_secret="test-only-secret-of-at-least-32-characters",
         postgres_host="127.0.0.1",
         postgres_port=1,
         postgres_password="test-only",
@@ -62,3 +63,34 @@ def test_password_is_required(monkeypatch):
     monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
     with pytest.raises(ValidationError):
         Settings(_env_file=None)
+
+
+def test_runtime_requires_jwt_secret(monkeypatch):
+    monkeypatch.delenv("AUTH_JWT_SECRET", raising=False)
+    settings = Settings(_env_file=None, postgres_password="test-only")
+    with pytest.raises(ValueError, match="AUTH_JWT_SECRET is required"):
+        with TestClient(create_app(settings)):
+            pass
+
+
+@pytest.mark.parametrize(
+    "origin,secure",
+    [
+        ("https://example.test/", True),
+        ("https://*.example.test", True),
+        ("https://example.test", False),
+        ("http://localhost:8000", True),
+        ("https://user@example.test", True),
+        ("https://example.test?other=1", True),
+    ],
+)
+def test_runtime_rejects_unsafe_origin_and_cookie_config(origin, secure):
+    settings = Settings(
+        _env_file=None,
+        postgres_password="test-only",
+        auth_jwt_secret="test-only-secret-of-at-least-32-characters",
+        auth_allowed_origin=origin,
+        auth_cookie_secure=secure,
+    )
+    with pytest.raises(ValueError):
+        settings.validate_auth_runtime()

@@ -26,6 +26,14 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-alfa_hack}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       DB_READINESS_TIMEOUT: ${DB_READINESS_TIMEOUT:-2}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?Set AUTH_JWT_SECRET in .env}
+      AUTH_JWT_ISSUER: ${AUTH_JWT_ISSUER:-alfa-hack}
+      AUTH_JWT_AUDIENCE: ${AUTH_JWT_AUDIENCE:-alfa-hack-web}
+      AUTH_SESSION_HOURS: ${AUTH_SESSION_HOURS:-8}
+      AUTH_ALLOWED_ORIGIN: ${AUTH_ALLOWED_ORIGIN:-http://localhost:8000}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
+    volumes:
+      - ./seed/accounts.json:/seed/accounts.json:ro
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     depends_on:

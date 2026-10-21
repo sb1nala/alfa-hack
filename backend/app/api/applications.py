@@ -1,10 +1,11 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Header, Path, Query
+from fastapi import APIRouter, Body, Depends, Header, Query
 
 from app.api import examples as ex
 from app.api.contract import endpoint, not_implemented
+from app.dependencies import ApplicationID, accessible_application, owned_application
 from app.schemas.applications import (
     AcceptOfferRequest,
     AdditionalInfoRequest,
@@ -20,7 +21,6 @@ from app.schemas.applications import (
 from app.schemas.common import ApplicationStatus, Page, PageQuery
 
 router = APIRouter(prefix="/api/applications", tags=["applications"])
-ApplicationID = Annotated[UUID, Path(examples=[ex.APPLICATION_ID])]
 
 
 @router.post(
@@ -67,6 +67,7 @@ async def list_applications(
         "Карточка собственной заявки. Последнее публичное решение, status, revision, "
         "allowed_actions. "
         "Банковские факторы и аналитическое объяснение никогда не возвращаются.",
+        access=owned_application,
     ),
 )
 async def get_application(application_id: ApplicationID) -> ClientApplication:
@@ -81,6 +82,7 @@ async def get_application(application_id: ApplicationID) -> ClientApplication:
         "Редактировать анкету только в DRAFT. Меняются только переданные поля; null очищает поле. "
         "Требуется expected_revision; неверный статус или ревизия — 409.",
         mutation=True,
+        access=owned_application,
     ),
 )
 async def edit_application(
@@ -121,6 +123,7 @@ async def edit_application(
         "Полнота анкеты и согласие на проверки будут проверяться при реализации.",
         mutation=True,
         status_code=202,
+        access=owned_application,
     ),
 )
 async def submit_application(
@@ -146,11 +149,10 @@ async def submit_application(
                 "allowed_actions": [],
             }
         },
-        "Отмена заявки → CANCELLED. Требуется expected_revision. Неоднозначность "
-        "отмены в документе "
-        "статусов и рекомендуемый список состояний описаны в общем описании API; "
-        "согласовать до реализации.",
+        "Отмена активной заявки до SIGNED → CANCELLED согласно docs/application-states.md. "
+        "Требуется expected_revision; переход реализуется в B06.",
         mutation=True,
+        access=owned_application,
     ),
 )
 async def cancel_application(
@@ -176,6 +178,7 @@ async def cancel_application(
         "Принять актуальный offer_id: APPROVED/COUNTER_OFFER → OFFER_ACCEPTED. "
         "expected_revision обязателен; чужое/устаревшее предложение или неверный статус — 409.",
         mutation=True,
+        access=owned_application,
     ),
 )
 async def accept_offer(
@@ -209,6 +212,7 @@ async def accept_offer(
         "Последнее решение сохраняется до появления нового.",
         mutation=True,
         status_code=202,
+        access=owned_application,
     ),
 )
 async def additional_info(
@@ -248,6 +252,7 @@ async def additional_info(
         "Выдача SIGNED → ISSUED — будущая системная операция, отдельный клиентский "
         "endpoint не нужен.",
         mutation=True,
+        access=owned_application,
     ),
 )
 async def sign(
@@ -274,6 +279,7 @@ async def sign(
         "Внутренние факторы, авторы банковских решений и сырые ответы моков исключены.",
         role="both",
         extra_errors=(410,),
+        access=accessible_application,
     ),
 )
 async def history(

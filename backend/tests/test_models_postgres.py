@@ -1,24 +1,17 @@
 """Opt-in real PostgreSQL tests; only the randomly named DB created here is destroyed."""
 
-import asyncio
-import os
-import subprocess
-import sys
 from datetime import UTC, date, datetime, timedelta, timezone
 from decimal import Decimal
-from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import delete, inspect, select, text, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 
-from app.config import Settings
-from app.database import create_engine, create_session_factory
+from app.database import create_session_factory
 from app.models import (
     Application,
     ApplicationEvent,
-    Base,
     Company,
     Decision,
     Document,
@@ -28,80 +21,6 @@ from app.models import (
 )
 
 pytestmark = pytest.mark.anyio
-BACKEND = Path(__file__).resolve().parents[1]
-
-
-def migrate(settings, *args):
-    env = {
-        **os.environ,
-        "POSTGRES_HOST": settings.postgres_host,
-        "POSTGRES_PORT": str(settings.postgres_port),
-        "POSTGRES_DB": settings.postgres_db,
-        "POSTGRES_USER": settings.postgres_user,
-        "POSTGRES_PASSWORD": settings.postgres_password.get_secret_value(),
-    }
-    result = subprocess.run(
-        [sys.executable, "-m", "alembic", *args],
-        cwd=BACKEND,
-        env=env,
-        text=True,
-        capture_output=True,
-        timeout=60,
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert settings.postgres_password.get_secret_value() not in result.stdout + result.stderr
-
-
-@pytest.fixture(scope="module")
-def database(request):
-    if not request.config.getoption("--run-postgres"):
-        pytest.skip("use --run-postgres with PostgreSQL 16 credentials (CREATE DATABASE required)")
-    admin = Settings()
-    name = "b03_test_" + uuid4().hex
-    settings = admin.model_copy(update={"postgres_db": name})
-
-    async def administer(statement):
-        engine = create_engine(admin)
-        try:
-            async with engine.connect() as connection:
-                connection = await connection.execution_options(isolation_level="AUTOCOMMIT")
-                assert (await connection.scalar(text("SHOW server_version_num"))).startswith("16")
-                await connection.execute(text(statement))
-        finally:
-            await engine.dispose()
-
-    async def tables():
-        engine = create_engine(settings)
-        try:
-            async with engine.connect() as connection:
-                return await connection.run_sync(lambda conn: inspect(conn).get_table_names())
-        finally:
-            await engine.dispose()
-
-    asyncio.run(administer(f'CREATE DATABASE "{name}" TEMPLATE template0'))
-    try:
-        migrate(settings, "upgrade", "head")
-        migrate(settings, "upgrade", "head")
-        migrate(settings, "check")
-        assert set(asyncio.run(tables())) == set(Base.metadata.tables) | {"alembic_version"}
-        migrate(settings, "downgrade", "base")
-        assert set(asyncio.run(tables())) == {"alembic_version"}
-        migrate(settings, "upgrade", "head")
-        migrate(settings, "check")
-        yield settings
-    finally:
-        asyncio.run(administer(f'DROP DATABASE "{name}" WITH (FORCE)'))
-
-
-@pytest.fixture
-async def session(database):
-    engine = create_engine(database)
-    try:
-        async with create_session_factory(engine)() as session:
-            yield session
-            await session.rollback()
-    finally:
-        await engine.dispose()
 
 
 def decision(application_id, **changes):

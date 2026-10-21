@@ -59,7 +59,7 @@ def install_openapi(app: FastAPI, routers: Sequence[APIRouter]) -> None:
                 "type": "apiKey",
                 "in": "cookie",
                 "name": "access_token",
-                "description": "JWT в HttpOnly cookie; только контракт, проверки пока отсутствуют.",
+                "description": "JWT в HttpOnly cookie; сервер проверяет подпись HS256 и сессию.",
             },
             "CSRFToken": {
                 "type": "apiKey",

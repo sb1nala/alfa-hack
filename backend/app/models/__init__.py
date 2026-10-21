@@ -265,3 +265,29 @@ class Document(Identity, CreatedAt, Base):
 
     application: Mapped[Application] = relationship()
     uploader: Mapped[User] = relationship()
+
+
+class AuthSession(Identity, CreatedAt, Base):
+    __tablename__ = "auth_sessions"
+    __table_args__ = (
+        CheckConstraint("expires_at > created_at", name="expiry_after_creation"),
+        CheckConstraint("revoked_at IS NULL OR revoked_at >= created_at", name="revocation_time"),
+        Index("ix_auth_sessions_user_revoked", "user_id", "revoked_at"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    role: Mapped[str] = mapped_column(api_enum("session_role", *(item.value for item in Role)))
+    expires_at: Mapped[datetime] = mapped_column(index=True)
+    revoked_at: Mapped[datetime | None]
+
+
+class CSRFContext(CreatedAt, Base):
+    __tablename__ = "csrf_contexts"
+    __table_args__ = (
+        CheckConstraint("length(cookie_digest) = 64", name="digest_length"),
+        CheckConstraint("expires_at > created_at", name="expiry_after_creation"),
+    )
+
+    cookie_digest: Mapped[str] = mapped_column(primary_key=True)
+    session_id: Mapped[UUID | None] = mapped_column(ForeignKey("auth_sessions.id"), index=True)
+    expires_at: Mapped[datetime] = mapped_column(index=True)

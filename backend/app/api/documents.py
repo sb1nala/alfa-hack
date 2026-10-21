@@ -6,6 +6,7 @@ from fastapi import APIRouter, File, Form, Path, Response, UploadFile
 from app.api import examples as ex
 from app.api.applications import ApplicationID
 from app.api.contract import endpoint, not_implemented
+from app.dependencies import accessible_application, application_document, owned_application
 from app.schemas.applications import Document, DocumentList
 
 router = APIRouter(prefix="/api/applications/{application_id}/documents", tags=["documents"])
@@ -19,6 +20,7 @@ upload_contract = endpoint(
     mutation=True,
     status_code=201,
     extra_errors=(413, 415),
+    access=owned_application,
 )
 upload_contract["openapi_extra"]["requestBody"] = {
     "content": {
@@ -55,6 +57,7 @@ async def upload_document(
         "Метаданные документов заявки: владелец client или underwriter. Пути "
         "хранилища не раскрываются.",
         role="both",
+        access=accessible_application,
     ),
 )
 async def list_documents(application_id: ApplicationID) -> DocumentList:
@@ -67,6 +70,7 @@ download_contract = endpoint(
     "Скачать документ как attachment: владелец client или underwriter. "
     "Будущий ответ — бинарное тело; Content-Disposition содержит безопасное имя файла.",
     role="both",
+    access=application_document,
     headers={
         "Content-Disposition": {
             "schema": {"type": "string"},

@@ -17,6 +17,15 @@ from pydantic import TypeAdapter, ValidationError
 
 from app.api import examples as ex
 from app.api.events import EVENT_EXAMPLES, STREAM_EXAMPLES
+from app.config import Settings
+from app.dependencies import (
+    accessible_application,
+    application_document,
+    database_session,
+    owned_application,
+    require_csrf,
+    require_role,
+)
 from app.export_openapi import DEFAULT_OUTPUT, render_openapi
 from app.main import create_app
 from app.schemas.applications import ClientApplication, SSEEvent
@@ -89,30 +98,31 @@ def wire_request(path, method, operation):
 @pytest.mark.parametrize(
     "path,method,operation", OPERATIONS, ids=[f"{m} {p}" for p, m, _ in OPERATIONS]
 )
-def test_every_valid_business_operation_is_501(path, method, operation):
-    # No lifespan: no settings/engine/session exists; routers must not need any of them.
-    client = TestClient(create_app())
-    verb, url, kwargs = wire_request(path, method, operation)
-    for _ in range(2):
+def test_operations_require_authentication_before_business_stubs(path, method, operation):
+    if not operation["x-required-roles"]:
+        return  # Anonymous auth is exercised against PostgreSQL in test_auth_postgres.py.
+    settings = Settings(
+        _env_file=None,
+        postgres_password="test-only",
+        auth_jwt_secret="test-only-secret-of-at-least-32-characters",
+    )
+    with TestClient(create_app(settings)) as client:
+        verb, url, kwargs = wire_request(path, method, operation)
         response = client.request(verb, url, **kwargs)
-        assert response.status_code == 501, response.text
-        assert response.headers["content-type"] == "application/json"
-        assert "set-cookie" not in response.headers
+        assert response.status_code == 401
         error = ErrorResponse.model_validate(response.json())
-        assert error.code == "NOT_IMPLEMENTED"
+        assert error.code == "UNAUTHENTICATED"
         assert error.field_errors == []
         assert str(error.request_id) == response.headers["X-Request-ID"]
-        validate(
-            response.json(), operation["responses"]["501"]["content"]["application/json"]["schema"]
-        )
-    assert not client.cookies
+        validate(response.json(), {"$ref": "#/components/schemas/ErrorResponse"})
+        assert "set-cookie" not in response.headers
 
 
 @pytest.mark.parametrize(
     "path,method,operation", OPERATIONS, ids=[f"{m} {p}" for p, m, _ in OPERATIONS]
 )
 def test_contract_structure_and_examples_per_operation(path, method, operation):
-    assert "501" in operation["responses"]
+    assert ("501" in operation["responses"]) == (not path.startswith("/api/auth/"))
     assert "422" in operation["responses"]
     assert any(int(code) < 300 for code in operation["responses"])
     assert operation["operationId"]
@@ -238,7 +248,18 @@ INVALID = [
 
 @pytest.mark.parametrize("method,url,kwargs", INVALID)
 def test_invalid_requests_use_documented_error(method, url, kwargs):
-    response = TestClient(create_app()).request(method, url, **kwargs)
+    app = create_app()
+
+    # Isolate request/schema validation. The real guards are tested with PostgreSQL.
+    async def allow():
+        return None
+
+    for roles in (("client",), ("underwriter",), ("client", "underwriter")):
+        app.dependency_overrides[require_role(*roles)] = allow
+    app.dependency_overrides[database_session] = allow
+    for guard in (require_csrf, owned_application, accessible_application, application_document):
+        app.dependency_overrides[guard] = allow
+    response = TestClient(app).request(method, url, **kwargs)
     assert response.status_code == 422, response.text
     error = ErrorResponse.model_validate(response.json())
     assert error.code == "VALIDATION_ERROR"
@@ -246,14 +267,6 @@ def test_invalid_requests_use_documented_error(method, url, kwargs):
     assert str(error.request_id) == response.headers["X-Request-ID"]
     assert "secret-do-not-echo" not in response.text
     validate(response.json(), {"$ref": "#/components/schemas/ErrorResponse"})
-
-
-def test_no_fake_authentication_checks():
-    client = TestClient(create_app())
-    # Contract requirements must not imply a working guard in this PR.
-    for headers in ({}, {"Cookie": "access_token=invalid", "X-CSRF-Token": "invalid"}):
-        assert client.post("/api/applications", json={}, headers=headers).status_code == 501
-        assert client.get("/api/auth/me", headers=headers).status_code == 501
 
 
 def test_five_outcomes_and_four_manual_transitions():
@@ -330,7 +343,9 @@ def test_statuses_match_team_document():
 
 def test_export_without_secrets_or_database_is_repeatable(tmp_path):
     env = {
-        key: value for key, value in os.environ.items() if not key.startswith(("POSTGRES_", "DB_"))
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith(("POSTGRES_", "DB_", "AUTH_"))
     }
     output = tmp_path / "openapi.yaml"
     command = [sys.executable, "-m", "app.export_openapi", "--output", str(output)]
