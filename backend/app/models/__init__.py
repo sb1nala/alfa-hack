@@ -188,6 +188,11 @@ class Decision(Identity, CreatedAt, Base):
     __tablename__ = "decisions"
     __table_args__ = (
         UniqueConstraint("application_id", "id"),
+        ForeignKeyConstraint(
+            ["application_id", "submission_id"],
+            ["application_submissions.application_id", "application_submissions.id"],
+            name="fk_decisions_submission",
+        ),
         CheckConstraint("input_revision > 0", name="input_revision_positive"),
         CheckConstraint("revision > 0", name="revision_positive"),
         Index("ix_decisions_application_revision", "application_id", "revision"),
@@ -205,6 +210,9 @@ class Decision(Identity, CreatedAt, Base):
             ),
         )
     )
+    # Nullable for pre-B08 history and future human-authored decisions.
+    submission_id: Mapped[UUID | None] = mapped_column(unique=True)
+    risk_result: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
     source: Mapped[str] = mapped_column(
         api_enum("source", *get_args(BankDecision.model_fields["source"].annotation))
     )
