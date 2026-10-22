@@ -43,6 +43,40 @@ def summary(application: Application) -> ClientApplicationSummary:
     )
 
 
+async def public_decision(db: AsyncSession, row: Decision) -> dict:
+    """Client-safe projection: no factors, authors, scores or analytical text."""
+    decision = {
+        "id": row.id,
+        "created_at": row.created_at,
+        "outcome": row.outcome,
+        "reasons": row.public_reasons,
+        "explanation": row.public_explanation,
+        "required_documents": row.required_documents,
+    }
+    if row.outcome in {"APPROVED", "COUNTER_OFFER"}:
+        offer = await db.scalar(
+            select(Offer).where(
+                Offer.decision_id == row.id, Offer.application_id == row.application_id
+            )
+        )
+        decision["offer"] = {
+            "id": offer.id,
+            "created_at": offer.created_at,
+            "expires_at": offer.expires_at,
+            "terms": {
+                "product_id": offer.product_id,
+                "amount": money(offer.amount),
+                "term_months": offer.term_months,
+                "annual_rate_percent": (
+                    format(offer.annual_rate_percent, "f")
+                    if offer.annual_rate_percent is not None
+                    else None
+                ),
+            },
+        }
+    return decision
+
+
 async def card(db: AsyncSession, application: Application) -> ClientApplication:
     decision = None
     if application.current_decision_id is not None:
@@ -53,35 +87,7 @@ async def card(db: AsyncSession, application: Application) -> ClientApplication:
             )
         )
         if row is not None:
-            decision = {
-                "id": row.id,
-                "created_at": row.created_at,
-                "outcome": row.outcome,
-                "reasons": row.public_reasons,
-                "explanation": row.public_explanation,
-                "required_documents": row.required_documents,
-            }
-            if row.outcome in {"APPROVED", "COUNTER_OFFER"}:
-                offer = await db.scalar(
-                    select(Offer).where(
-                        Offer.decision_id == row.id, Offer.application_id == application.id
-                    )
-                )
-                decision["offer"] = {
-                    "id": offer.id,
-                    "created_at": offer.created_at,
-                    "expires_at": offer.expires_at,
-                    "terms": {
-                        "product_id": offer.product_id,
-                        "amount": money(offer.amount),
-                        "term_months": offer.term_months,
-                        "annual_rate_percent": (
-                            format(offer.annual_rate_percent, "f")
-                            if offer.annual_rate_percent is not None
-                            else None
-                        ),
-                    },
-                }
+            decision = await public_decision(db, row)
     return ClientApplication(
         **summary(application).model_dump(),
         owner_id=application.owner_id,

@@ -1,11 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, Request
 
+from app import underwriting
 from app.api import examples as ex
 from app.api.applications import ApplicationID
-from app.api.contract import endpoint, not_implemented
-from app.dependencies import accessible_application
+from app.api.contract import endpoint
+from app.dependencies import DBSession, Principal, accessible_application, require_role
+from app.models import Application
 from app.schemas.common import ApplicationStatus, Page, PageQuery
 from app.schemas.underwriting import (
     ManualDecisionRequest,
@@ -24,13 +26,15 @@ router = APIRouter(prefix="/api/underwriter/applications", tags=["underwriting"]
         "Банковская очередь. По умолчанию MANUAL_REVIEW; фильтр status, пагинация offset/limit. "
         "Сортировка updated_at ASC, id ASC. Доступ только underwriter.",
         role="underwriter",
+        implemented=True,
     ),
 )
 async def queue(
     page: Annotated[PageQuery, Depends()],
+    db: DBSession,
     status: ApplicationStatus = ApplicationStatus.MANUAL_REVIEW,
 ) -> Page[UnderwriterQueueItem]:
-    not_implemented()
+    return await underwriting.queue(db, status.value, page)
 
 
 @router.get(
@@ -42,10 +46,15 @@ async def queue(
         "и аналитическим объяснением. Никогда не использовать её схему в клиентском API.",
         role="underwriter",
         access=accessible_application,
+        implemented=True,
     ),
 )
-async def bank_card(application_id: ApplicationID) -> UnderwriterApplication:
-    not_implemented()
+async def bank_card(
+    application_id: ApplicationID,
+    db: DBSession,
+    application: Annotated[Application, Depends(accessible_application)],
+) -> UnderwriterApplication:
+    return await underwriting.bank_card(db, application)
 
 
 @router.post(
@@ -83,14 +92,24 @@ async def bank_card(application_id: ApplicationID) -> UnderwriterApplication:
         "Ручное решение только из MANUAL_REVIEW: APPROVED, COUNTER_OFFER, NEEDS_INFO или REJECTED. "
         "Повторный MANUAL_REVIEW не является переходом в текущем документе. "
         "expected_revision обязателен. Решение добавляется в историю, старое не перезаписывается. "
-        "explanation — клиенту, analytical_explanation — только банку.",
+        "explanation — клиенту, analytical_explanation — только банку. "
+        "Для APPROVED/COUNTER_OFFER product_id должен ссылаться на активный продукт (иначе 422); "
+        "предложение сохраняется со снимком продукта. Автор решения — текущий underwriter.",
         role="underwriter",
         access=accessible_application,
         mutation=True,
+        implemented=True,
     ),
 )
 async def manual_decision(
     application_id: ApplicationID,
     body: Annotated[ManualDecisionRequest, Body(openapi_examples=ex.examples(ex.MANUAL_REQUESTS))],
+    db: DBSession,
+    principal: Annotated[Principal, Depends(require_role("underwriter"))],
+    request: Request,
 ) -> UnderwriterApplication:
-    not_implemented()
+    result = await underwriting.decide(
+        db, application_id, body, principal, request.state.request_id
+    )
+    await db.commit()
+    return result

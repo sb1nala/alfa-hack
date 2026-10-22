@@ -6714,11 +6714,8 @@ paths:
       - underwriter
   /api/underwriter/applications:
     get:
-      description: 'Банковская очередь. По умолчанию MANUAL_REVIEW; фильтр status, пагинация offset/limit.
+      description: Банковская очередь. По умолчанию MANUAL_REVIEW; фильтр status, пагинация offset/limit.
         Сортировка updated_at ASC, id ASC. Доступ только underwriter.
-
-
-        Бизнес-заглушка: 501 после проверок доступа.'
       operationId: queue_api_underwriter_applications_get
       parameters:
       - in: query
@@ -6764,7 +6761,12 @@ paths:
                     total: 1
               schema:
                 $ref: '#/components/schemas/Page_UnderwriterQueueItem_'
-          description: Будущий успешный ответ (после проверок доступа пока 501)
+          description: Успешный ответ
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
         '400':
           content:
             application/json:
@@ -6780,6 +6782,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректный запрос
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -6799,6 +6805,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Требуется вход
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -6818,6 +6828,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Недостаточно прав или неверный CSRF-токен
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -6837,6 +6851,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Ресурс не найден или недоступен этому владельцу
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -6859,6 +6877,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректные параметры запроса
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -6878,6 +6900,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Слишком много запросов
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -6897,25 +6923,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Внутренняя ошибка
           headers:
-            X-Request-ID:
+            Cache-Control:
               schema:
-                format: uuid
+                const: no-store
                 type: string
-        '501':
-          content:
-            application/json:
-              examples:
-                error:
-                  summary: 'Синтетический пример: error'
-                  value:
-                    code: NOT_IMPLEMENTED
-                    field_errors: []
-                    message: Контракт определён; бизнес-операция пока не реализована
-                    request_id: 80000000-0000-4000-8000-000000000001
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Контракт определён; бизнес-операция пока не реализована
-          headers:
             X-Request-ID:
               schema:
                 format: uuid
@@ -6930,10 +6941,7 @@ paths:
   /api/underwriter/applications/{application_id}:
     get:
       description: 'Банковская карточка: клиентские данные + история решений с внутренними факторами и
-        аналитическим объяснением. Никогда не использовать её схему в клиентском API.
-
-
-        Бизнес-заглушка: 501 после проверок доступа.'
+        аналитическим объяснением. Никогда не использовать её схему в клиентском API.'
       operationId: bank_card_api_underwriter_applications__application_id__get
       parameters:
       - in: path
@@ -6997,7 +7005,12 @@ paths:
                       source: automatic
               schema:
                 $ref: '#/components/schemas/UnderwriterApplication'
-          description: Будущий успешный ответ (после проверок доступа пока 501)
+          description: Успешный ответ
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
         '400':
           content:
             application/json:
@@ -7013,6 +7026,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректный запрос
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -7032,6 +7049,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Требуется вход
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -7051,6 +7072,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Недостаточно прав или неверный CSRF-токен
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -7070,6 +7095,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Ресурс не найден или недоступен этому владельцу
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -7092,6 +7121,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректные параметры запроса
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -7111,6 +7144,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Слишком много запросов
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -7130,25 +7167,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Внутренняя ошибка
           headers:
-            X-Request-ID:
+            Cache-Control:
               schema:
-                format: uuid
+                const: no-store
                 type: string
-        '501':
-          content:
-            application/json:
-              examples:
-                error:
-                  summary: 'Синтетический пример: error'
-                  value:
-                    code: NOT_IMPLEMENTED
-                    field_errors: []
-                    message: Контракт определён; бизнес-операция пока не реализована
-                    request_id: 80000000-0000-4000-8000-000000000001
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Контракт определён; бизнес-операция пока не реализована
-          headers:
             X-Request-ID:
               schema:
                 format: uuid
@@ -7165,10 +7187,8 @@ paths:
       description: 'Ручное решение только из MANUAL_REVIEW: APPROVED, COUNTER_OFFER, NEEDS_INFO или REJECTED.
         Повторный MANUAL_REVIEW не является переходом в текущем документе. expected_revision обязателен.
         Решение добавляется в историю, старое не перезаписывается. explanation — клиенту, analytical_explanation
-        — только банку.
-
-
-        Бизнес-заглушка: 501 после проверок доступа.'
+        — только банку. Для APPROVED/COUNTER_OFFER product_id должен ссылаться на активный продукт (иначе
+        422); предложение сохраняется со снимком продукта. Автор решения — текущий underwriter.'
       operationId: manual_decision_api_underwriter_applications__application_id__decision_post
       parameters:
       - in: path
@@ -7320,7 +7340,12 @@ paths:
                       source: underwriter
               schema:
                 $ref: '#/components/schemas/UnderwriterApplication'
-          description: Будущий успешный ответ (после проверок доступа пока 501)
+          description: Успешный ответ
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
         '400':
           content:
             application/json:
@@ -7336,6 +7361,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректный запрос
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -7355,6 +7384,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Требуется вход
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -7374,6 +7407,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Недостаточно прав или неверный CSRF-токен
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -7393,6 +7430,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Ресурс не найден или недоступен этому владельцу
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -7412,6 +7453,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Конфликт состояния, ревизии или ключа идемпотентности
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -7434,6 +7479,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректные параметры запроса
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -7453,6 +7502,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Слишком много запросов
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -7472,25 +7525,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Внутренняя ошибка
           headers:
-            X-Request-ID:
+            Cache-Control:
               schema:
-                format: uuid
+                const: no-store
                 type: string
-        '501':
-          content:
-            application/json:
-              examples:
-                error:
-                  summary: 'Синтетический пример: error'
-                  value:
-                    code: NOT_IMPLEMENTED
-                    field_errors: []
-                    message: Контракт определён; бизнес-операция пока не реализована
-                    request_id: 80000000-0000-4000-8000-000000000001
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Контракт определён; бизнес-операция пока не реализована
-          headers:
             X-Request-ID:
               schema:
                 format: uuid
