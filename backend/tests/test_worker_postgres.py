@@ -132,7 +132,7 @@ async def due(rig, claim):
 
 
 @pytest.mark.anyio
-async def test_success_snapshot_revisions_audit_and_no_b08_claim(rig):
+async def test_success_snapshot_revisions_audit_and_decision_handoff(rig):
     async with rig.sessions.begin() as db:
         await db.execute(
             update(Application)
@@ -148,7 +148,6 @@ async def test_success_snapshot_revisions_audit_and_no_b08_claim(rig):
     async with rig.worker(handler) as worker:
         claim = await worker.claim()
         await worker.process(claim)
-        assert await worker.claim() is None
         await worker.process(claim)
     app, job, checks, events = await rig.state()
     assert (app.status, app.revision, app.input_revision) == ("SCORING", 4, 2)
@@ -458,7 +457,8 @@ async def test_real_demo_bki_first_two_503_then_success(rig):
             assert state[0].status == ("SCORING" if n == 3 else "CHECKING")
             if n < 3:
                 assert state[1].last_error_category == "http_503"
-        assert await worker.claim() is None
+        decision_claim = await worker.claim()
+        assert decision_claim.phase == "decision"
     assert state[2].bki == {"inn": company["company"]["inn"], **company["mocks"]["bki"]}
 
 
@@ -635,7 +635,7 @@ def test_invalid_worker_configuration(changes):
 
 
 @pytest.mark.anyio
-async def test_operator_requeue_is_atomic_and_cannot_requeue_b08(rig):
+async def test_operator_requeue_is_atomic_and_cannot_requeue_pending_job(rig):
     from app.requeue import requeue
 
     async with rig.worker(lambda r: httpx.Response(404)) as worker:

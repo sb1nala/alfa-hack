@@ -51,7 +51,7 @@ def main() -> None:
         "docker",
         "compose",
         "--project-name",
-        f"alfa-b07-check-{uuid4().hex[:10]}",
+        f"alfa-b08-check-{uuid4().hex[:10]}",
         "--env-file",
         str(ROOT / ".env.example"),
         "-f",
@@ -235,7 +235,7 @@ def main() -> None:
                     "product_id": products[0]["id"],
                     "amount": "100000.01",
                     "term_months": 12,
-                    "purpose": "Пополнение оборотных средств",
+                    "purpose": "purchase_goods",
                 },
             )
             assert edited["revision"] == 2 and edited["form"]["amount"] == "100000.01"
@@ -417,7 +417,7 @@ def main() -> None:
                 card = api_request(new_path, 200)
                 return card if card["status"] == status else None
 
-            def assert_handoff(sent, retries=0):
+            def assert_decided(sent, retries=0, outcome="APPROVED"):
                 identity = sent["id"]
                 assert (
                     sql(
@@ -430,7 +430,7 @@ def main() -> None:
                         f"FROM applications a JOIN pipeline_jobs j ON j.application_id=a.id "
                         f"WHERE a.id='{identity}'"
                     )
-                    == f"SCORING|2|{4 + retries}|decision|pending|0|t|1|1"
+                    == f"{outcome}|2|{5 + retries}|decision|completed|1|t|1|1"
                 )
                 # All three raw sources persist, remain internal, and share one submission.
                 assert (
@@ -442,27 +442,60 @@ def main() -> None:
                     == "t"
                 )
 
+                assert (
+                    sql(
+                        "SELECT count(*) FROM decisions "
+                        f"WHERE application_id='{identity}' AND risk_result IS NOT NULL"
+                    )
+                    == "1"
+                )
+                assert sql(f"SELECT count(*) FROM offers WHERE application_id='{identity}'") == (
+                    "1" if outcome in {"APPROVED", "COUNTER_OFFER"} else "0"
+                )
+                decision = api_request("applications/" + identity, 200)["decision"]
+                assert decision["outcome"] == outcome
+                assert set(decision) == {
+                    "id",
+                    "created_at",
+                    "outcome",
+                    "reasons",
+                    "explanation",
+                    "required_documents",
+                } | ({"offer"} if outcome in {"APPROVED", "COUNTER_OFFER"} else set())
+
             new_path, sent = new_submission(company_data)
             run("up", "-d", "--scale", "worker=2", "worker")
             until(lambda: at_status(new_path, "CHECKING"))
-            until(lambda: at_status(new_path, "SCORING"))
-            assert_handoff(sent)
+            until(lambda: at_status(new_path, "APPROVED"))
+            assert_decided(sent)
             print(
-                "PASS two real workers: CHECKING -> three stored responses -> SCORING", flush=True
+                "PASS two real workers: CHECKING -> stored responses -> SCORING -> real APPROVED",
+                flush=True,
             )
 
             records = json.loads((ROOT / "seed/companies.json").read_text())["companies"]
             bki_company = next(c for c in records if c["client_login"] == "demo-bki")
             new_path, bki_sent = new_submission(bki_company)
             until(lambda: at_status(new_path, "CHECKING"))
-            until(lambda: at_status(new_path, "SCORING"))
-            assert_handoff(bki_sent, retries=2)
-            print("PASS real demo-bki: two 503, two audited retries, then handoff", flush=True)
+            until(lambda: at_status(new_path, "APPROVED"))
+            assert_decided(bki_sent, retries=2)
+            print(
+                "PASS real demo-bki: two 503, two audited retries, then real APPROVED", flush=True
+            )
+
+            for record in records:
+                if record["key"] in {"approve", "bki_failure"}:
+                    continue
+                scenario_path, scenario = new_submission(record)
+                expected = record["expected_outcome"]
+                until(lambda p=scenario_path, status=expected: at_status(p, status))
+                assert_decided(scenario, outcome=expected)
+                print(f"PASS real decide scenario {record['key']}: {expected}", flush=True)
 
             # Graceful SIGTERM and successful commit survive process restart.
             run("restart", "worker")
-            assert_handoff(sent)
-            assert_handoff(bki_sent, retries=2)
+            assert_decided(sent)
+            assert_decided(bki_sent, retries=2)
             new_path, crashed = new_submission(company_data)
             until(lambda: at_status(new_path, "CHECKING"))
             run("kill", "-s", "SIGKILL", "worker")
@@ -475,8 +508,8 @@ def main() -> None:
                 == "0"
             )
             run("start", "worker")
-            until(lambda: at_status(new_path, "SCORING"))
-            assert_handoff(crashed)
+            until(lambda: at_status(new_path, "APPROVED"))
+            assert_decided(crashed)
             print(
                 "PASS SIGTERM/restart and crash during HTTP recovered by expired lease", flush=True
             )
@@ -520,9 +553,9 @@ def main() -> None:
             )
             print("PASS cancel during real HTTP prevents late result persistence", flush=True)
 
-            # Queue is idle: B07 never consumes pending decision jobs.
-            assert_handoff(sent)
-            assert_handoff(bki_sent, retries=2)
+            # Completed jobs remain idle across restarts and database outages.
+            assert_decided(sent)
+            assert_decided(bki_sent, retries=2)
             run("stop", "db")
             until(
                 lambda: (
@@ -541,8 +574,8 @@ def main() -> None:
             run("start", "db")
             wait_ready()
             new_path, recovered = new_submission(company_data)
-            until(lambda: at_status(new_path, "SCORING"))
-            assert_handoff(recovered)
+            until(lambda: at_status(new_path, "APPROVED"))
+            assert_decided(recovered)
             print("PASS workers survive DB disconnect and resume processing", flush=True)
 
             auth_request("logout", 204, body={}, token=token)
@@ -551,7 +584,7 @@ def main() -> None:
             auth_request("csrf", 200)
             print(
                 "PASS Docker login, drafts, submit/replay, restart, cancel, "
-                "audit, queue, worker checks, lease and recovery",
+                "audit, queue, real decisions, lease and recovery",
                 flush=True,
             )
         except BaseException:

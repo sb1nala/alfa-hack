@@ -1,4 +1,4 @@
-"""PostgreSQL checks worker. Run separately: python -m app.worker."""
+"""PostgreSQL checks/decision worker. Run separately: python -m app.worker."""
 
 import asyncio
 import logging
@@ -9,12 +9,14 @@ from datetime import timedelta
 from uuid import UUID, uuid4
 
 import httpx
+from pydantic import ValidationError
 from sqlalchemy import and_, func, or_, select, update
 
+from app import decision_adapter, drafts
 from app.check_sources import SourceError, fetch_checks
 from app.config import Settings
 from app.database import create_engine, create_session_factory
-from app.models import ApplicationSubmission, PipelineJob, SubmissionChecks
+from app.models import Application, ApplicationSubmission, PipelineJob, SubmissionChecks
 from app.submissions import job_applicable
 from app.transitions import lock_application, transition
 
@@ -32,6 +34,7 @@ class Claim:
     submission_id: UUID
     token: UUID
     attempt: int
+    phase: str
 
 
 class Worker:
@@ -42,11 +45,12 @@ class Worker:
 
     def log(self, claim: Claim, stage: str, category: str):
         logger.info(
-            "job=%s application=%s submission=%s attempt=%s stage=%s category=%s",
+            "job=%s application=%s submission=%s attempt=%s phase=%s stage=%s category=%s",
             claim.job_id,
             claim.application_id,
             claim.submission_id,
             claim.attempt,
+            claim.phase,
             stage,
             category,
         )
@@ -70,7 +74,7 @@ class Worker:
             job = await db.scalar(
                 select(PipelineJob)
                 .where(
-                    PipelineJob.phase == "checks",
+                    PipelineJob.phase.in_(["checks", "decision"]),
                     PipelineJob.kind == "application_pipeline",
                     or_(
                         and_(
@@ -94,7 +98,12 @@ class Worker:
             job.lease_expires_at = now + timedelta(seconds=self.settings.worker_lease_seconds)
             job.attempts += 1
             claim = Claim(
-                job.id, job.application_id, job.submission_id, job.lease_token, job.attempts
+                job.id,
+                job.application_id,
+                job.submission_id,
+                job.lease_token,
+                job.attempts,
+                job.phase,
             )
         self.log(claim, "claim", "acquired")
         return claim
@@ -113,7 +122,7 @@ class Worker:
             job is None
             or job.application_id != claim.application_id
             or job.submission_id != claim.submission_id
-            or job.phase != "checks"
+            or job.phase != claim.phase
             or job.kind != "application_pipeline"
             or job.state != "running"
             or job.lease_token != claim.token
@@ -126,7 +135,8 @@ class Worker:
         if (
             submission is None
             or not job_applicable(app, submission, job)
-            or app.status not in {"SUBMITTED", "CHECKING"}
+            or app.status
+            not in ({"SUBMITTED", "CHECKING"} if claim.phase == "checks" else {"SCORING"})
         ):
             await self.fence(
                 db,
@@ -140,21 +150,36 @@ class Worker:
             return None
         return app, job, submission
 
-    async def fence(self, db, claim: Claim, **values):
+    async def fence(self, db, claim: Claim, *, input_revision=None, status=None, **values):
         # Recheck expiry after result/audit writes, immediately before commit.
         # Failure rolls back the entire transaction, including those inserts.
         await db.flush()
+        conditions = [
+            PipelineJob.id == claim.job_id,
+            PipelineJob.application_id == claim.application_id,
+            PipelineJob.submission_id == claim.submission_id,
+            PipelineJob.kind == "application_pipeline",
+            PipelineJob.phase == claim.phase,
+            PipelineJob.state == "running",
+            PipelineJob.lease_token == claim.token,
+            PipelineJob.lease_expires_at > func.clock_timestamp(),
+        ]
+        if input_revision is not None:
+            conditions.append(
+                select(Application.id)
+                .join(ApplicationSubmission, ApplicationSubmission.application_id == Application.id)
+                .where(
+                    Application.id == claim.application_id,
+                    Application.status == status,
+                    Application.input_revision == input_revision,
+                    ApplicationSubmission.id == claim.submission_id,
+                    ApplicationSubmission.input_revision == input_revision,
+                )
+                .exists()
+            )
         result = await db.execute(
             update(PipelineJob)
-            .where(
-                PipelineJob.id == claim.job_id,
-                PipelineJob.application_id == claim.application_id,
-                PipelineJob.submission_id == claim.submission_id,
-                PipelineJob.phase == "checks",
-                PipelineJob.state == "running",
-                PipelineJob.lease_token == claim.token,
-                PipelineJob.lease_expires_at > func.clock_timestamp(),
-            )
+            .where(*conditions)
             .values(**values)
             .returning(PipelineJob.id)
             .execution_options(synchronize_session=False)
@@ -176,12 +201,14 @@ class Worker:
                 "job_id": str(claim.job_id),
                 "submission_id": str(claim.submission_id),
                 "attempt": claim.attempt,
-                "phase": "checks",
+                "phase": claim.phase,
                 **audit,
             },
         )
 
     async def start(self, claim: Claim) -> str | None:
+        if claim.phase != "checks":
+            raise LostLease
         async with self.transaction() as db:
             rows = await self.locked(db, claim)
             if rows is None:
@@ -202,6 +229,8 @@ class Worker:
         return inn
 
     async def succeed(self, claim: Claim, checks: dict):
+        if claim.phase != "checks":
+            raise LostLease
         async with self.transaction() as db:
             rows = await self.locked(db, claim)
             if rows is None:
@@ -237,16 +266,17 @@ class Worker:
                     self.settings.worker_retry_max,
                     self.settings.worker_retry_base * 2 ** (claim.attempt - 1),
                 )
-                await self.move(
-                    db,
-                    app,
-                    claim,
-                    "CHECKING",
-                    "Проверка данных будет повторена",
-                    stage=error.stage,
-                    category=error.category,
-                    retry_seconds=delay,
-                )
+                if claim.phase == "checks":
+                    await self.move(
+                        db,
+                        app,
+                        claim,
+                        "CHECKING",
+                        "Проверка данных будет повторена",
+                        stage=error.stage,
+                        category=error.category,
+                        retry_seconds=delay,
+                    )
             else:
                 delay = 0
             await self.fence(
@@ -261,31 +291,84 @@ class Worker:
             )
         self.log(claim, error.stage, error.category)
 
+    async def load_decision(self, claim: Claim):
+        if claim.phase != "decision":
+            raise LostLease
+        async with self.transaction() as db:
+            rows = await self.locked(db, claim)
+            if rows is None:
+                return None
+            _, _, submission = rows
+            checks = await db.get(SubmissionChecks, claim.submission_id)
+            await self.fence(db, claim, lease_token=claim.token)
+        return submission, checks
+
+    async def save_decision(self, claim: Claim, result):
+        if claim.phase != "decision":
+            raise LostLease
+        async with self.transaction() as db:
+            rows = await self.locked(db, claim)
+            if rows is None:
+                return
+            app, _, submission = rows
+            row = await decision_adapter.save_result(db, app, submission, result)
+            await self.move(
+                db, app, claim, result.outcome, result.explanation, decision_id=str(row.id)
+            )
+            # Validate the existing public projection before committing anything.
+            try:
+                await drafts.card(db, app)
+            except ValidationError:
+                raise decision_adapter.incompatible("invalid_result") from None
+            await self.fence(
+                db,
+                claim,
+                state="completed",
+                input_revision=submission.input_revision,
+                status=result.outcome,
+                lease_token=None,
+                lease_expires_at=None,
+                last_error_stage=None,
+                last_error_category=None,
+            )
+        self.log(claim, "persistence", "completed")
+
     async def process(self, claim: Claim):
         stage = "start"
         try:
             async with asyncio.timeout(self.settings.worker_attempt_timeout):
-                inn = await self.start(claim)
-                if inn is None:
-                    return
+                if claim.phase == "decision":
+                    inputs = await self.load_decision(claim)
+                    if inputs is None:
+                        return
+                else:
+                    inn = await self.start(claim)
+                    if inn is None:
+                        return
                 if claim.attempt > self.settings.worker_max_attempts:
-                    raise SourceError("checks", "attempts_exhausted", retryable=False)
-                stage = "checks"
-                checks = await fetch_checks(self.client, inn, self.settings.worker_http_timeout)
-                stage = "persistence"
-                await self.succeed(claim, checks)
+                    raise SourceError(claim.phase, "attempts_exhausted", retryable=False)
+                stage = claim.phase
+                if claim.phase == "decision":
+                    # No DB transaction or HTTP during the pure calculation.
+                    result = await asyncio.to_thread(decision_adapter.calculate, *inputs)
+                    stage = "persistence"
+                    await self.save_decision(claim, result)
+                else:
+                    checks = await fetch_checks(self.client, inn, self.settings.worker_http_timeout)
+                    stage = "persistence"
+                    await self.succeed(claim, checks)
         except LostLease:
-            self.log(claim, "checks", "lost_lease")
+            self.log(claim, claim.phase, "lost_lease")
         except (SourceError, TimeoutError) as error:
             if isinstance(error, TimeoutError):
-                if stage != "checks":
+                if stage not in {"checks", "decision"}:
                     self.log(claim, stage, "database_timeout")
                     raise
-                error = SourceError("checks", "attempt_timeout", retryable=True)
+                error = SourceError(stage, "attempt_timeout", retryable=True)
             try:
                 await self.fail(claim, error)
             except LostLease:
-                self.log(claim, "checks", "lost_lease")
+                self.log(claim, claim.phase, "lost_lease")
         # DB errors propagate; the supervisor recovers by lease, never reports success.
 
     async def run(self, stop: asyncio.Event):
