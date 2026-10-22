@@ -15,10 +15,14 @@ AS_OF = date(2026, 10, 21)
 BASE = next(c for c in seed_companies()["companies"] if c["key"] == "approve")
 
 
-def run(changes=None, documents=(), application=None, legal_form=None):
+def run(changes=None, documents=(), application=None, legal_form=None, replace_pb=False):
+    """replace_pb=True swaps the whole ФНС response (to drop fields) instead of updating it."""
     company = copy.deepcopy(BASE)
     for source, fields in (changes or {}).items():
-        company["mocks"][source].update(fields)
+        if source == "pb" and replace_pb:
+            company["mocks"]["pb"] = dict(fields)
+        else:
+            company["mocks"][source].update(fields)
     if legal_form:
         company["company"]["legal_form"] = legal_form
     return decide(*build_inputs(company, AS_OF, application, documents))

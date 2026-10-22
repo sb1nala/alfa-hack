@@ -23,6 +23,10 @@ def _optional_money(value: Any) -> Decimal | None:
     return None if value is None else _money(value)
 
 
+def _optional_bool(value: Any) -> bool | None:
+    return None if value is None else bool(value)
+
+
 @dataclass(frozen=True)
 class ApplicationInput:
     product_code: str
@@ -74,14 +78,17 @@ class EgrulReport:
 
 @dataclass(frozen=True)
 class PbReport:
-    """ФНС «Прозрачный бизнес». ``available=False`` — no financial data for the last year."""
+    """ФНС «Прозрачный бизнес». ``available=False`` — no financial data for the last year.
+
+    ``None`` means the service did not return the field: unknown, never "no risk".
+    """
 
     available: bool
     revenue: Decimal | None
     expenses: Decimal | None
-    tax_arrears: Decimal
-    mass_address: bool
-    director_disqualified: bool
+    tax_arrears: Decimal | None
+    mass_address: bool | None
+    director_disqualified: bool | None
     employees: int | None = None
 
     @classmethod
@@ -90,9 +97,9 @@ class PbReport:
             available=bool(data.get("available", True)),
             revenue=_optional_money(data.get("revenue")),
             expenses=_optional_money(data.get("expenses")),
-            tax_arrears=_money(data.get("tax_arrears", "0.00")),
-            mass_address=bool(data.get("mass_address", False)),
-            director_disqualified=bool(data.get("director_disqualified", False)),
+            tax_arrears=_optional_money(data.get("tax_arrears")),
+            mass_address=_optional_bool(data.get("mass_address")),
+            director_disqualified=_optional_bool(data.get("director_disqualified")),
             employees=data.get("employees"),
         )
 
@@ -178,8 +185,13 @@ class Decision:
     # Bank only: never sent to the client.
     score: int | None = None
     risk_class: str | None = None
-    dscr: Decimal | None = None
+    # DSCR of the requested terms at the product's base rate (the scorecard factor)
+    requested_dscr: Decimal | None = None
+    # DSCR of the offered terms at the final rate; None without an offer
+    offer_dscr: Decimal | None = None
     scoring_factors: tuple[ScoringFactor, ...] = ()
     stop_factors: tuple[str, ...] = ()
     review_reason: str | None = None
+    # ФНС fields the service did not return (see PbReport)
+    data_gaps: tuple[str, ...] = ()
     analytical_explanation: str = ""
