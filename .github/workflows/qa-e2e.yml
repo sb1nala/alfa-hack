@@ -17,6 +17,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.node-version
+
       - name: Быстрый старт — шаг 1 (README)
         run: |
           cp .env.example .env
@@ -24,6 +28,15 @@ jobs:
           sed -i "s|^AUTH_JWT_SECRET=.*|AUTH_JWT_SECRET=${secret}|" .env
           docker version --format 'Docker {{.Server.Version}}'
           docker compose version
+
+      - name: Обход бага #76 — перегенерировать типы фронтенда (только в QA-ветке)
+        if: ${{ vars.QA_SKIP_76_WORKAROUND != 'true' }}
+        run: |
+          cd frontend
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm api:generate
+          git diff --stat -- src/api/schema.d.ts
 
       - name: Быстрый старт — шаг 2 (README)
         run: |
@@ -42,6 +55,13 @@ jobs:
 
       - name: Прогон сценариев через API (run_e2e.py)
         run: python3 api-collection/run_e2e.py --markdown | tee e2e.txt
+
+      - name: Прогон интерфейса в браузере (Playwright)
+        if: always()
+        run: |
+          python3 -m pip install --quiet playwright==1.48.0
+          python3 -m playwright install --with-deps chromium > /dev/null
+          python3 qa/ui_walkthrough.py | tee ui.txt
 
       - name: Отказоустойчивость — БД (README, «Проверки и тесты»)
         if: always()
@@ -64,6 +84,7 @@ jobs:
             echo "Подъём стенда: ${STAND_UP_SECONDS:-?} с"
             echo '```'; cat services.txt 2>/dev/null; echo '```'
             echo '```'; cat e2e.txt 2>/dev/null; echo '```'
+            echo '```'; cat ui.txt 2>/dev/null; echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           docker compose logs --no-color --timestamps > compose-logs.txt 2>&1 || true
 
@@ -73,6 +94,8 @@ jobs:
           name: qa-e2e-logs
           path: |
             e2e.txt
+            ui.txt
+            qa/screenshots/
             services.txt
             compose-logs.txt
           retention-days: 7
