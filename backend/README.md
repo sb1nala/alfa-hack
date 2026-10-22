@@ -4,7 +4,8 @@ Python 3.12, FastAPI, async SQLAlchemy 2/asyncpg, PostgreSQL 16, Alembic, uv.
 B01–B08: авторизация, JWT-сессии, CSRF, роли, каталог продуктов, поиск компании через
 локальный мок ЕГРЮЛ, черновики, submit/cancel, аудит и постоянные задания в PostgreSQL.
 Один worker выполняет проверки B07 и настоящее решение B08; GET карточки возвращает результат.
-B08 реализован в ветке feat/backend-decision, на ревью; до слияния не является частью main.
+Код B08 из feat/backend-decision (333cc6c) включён владельцем репозитория в main
+через [PR #64](https://github.com/sb1nala/alfa-hack/pull/64).
 Банковские операции, файлы, история API и SSE пока возвращают `501` после проверок доступа.
 Контракт: `../docs/openapi.yaml`.
 
@@ -373,9 +374,8 @@ uv run --locked python ../scripts/check_docker.py
 DOCKER_BUILD_CA=/path/to/combined-ca.pem uv run --locked python ../scripts/check_docker.py
 ```
 
-Полный Ruff check применяется ко всему backend. В актуальном main есть существующее
-отклонение форматирования `app/decision/texts.py`, принадлежащего рискам; B05 его не
-меняет. Проверка всех файлов вне этой папки:
+Полный Ruff check применяется ко всему backend. Форматирование модуля рисков
+принадлежит его владельцу; проверка принадлежащих бэкенду файлов исключает app/decision:
 
 ```bash
 uv run --locked ruff format --check . ../scripts --extend-exclude app/decision
@@ -529,7 +529,7 @@ code разрешается в UUID активного каталожного п
 | Поле decisions | Назначение |
 | --- | --- |
 | submission_id | Nullable UUID, UNIQUE и составной FK (application_id, submission_id) к отправке. Не более одного автоматического решения на отправку; старая история и будущие ручные решения допускают null. |
-| risk_result | Nullable JSONB полного dataclass Decision: публичные поля и score, risk_class, dscr, scoring_factors, stop_factors, review_reason, analytical_explanation, offer.monthly_payment и остальные поля. Decimal — точные строки, tuple — JSON-массивы. Null только для прежней истории. |
+| risk_result | Nullable JSONB полного dataclass Decision: публичные поля и score, risk_class, requested_dscr, offer_dscr, data_gaps, scoring_factors, stop_factors, review_reason, analytical_explanation, offer.monthly_payment и остальные поля. Decimal — точные строки, tuple — JSON-массивы. Null только для прежней истории. |
 
 Публичные поля, scoring_factors и analytical_explanation также заполняют существующие
 колонки ORM. GET карточки читает явный список публичных полей и условий: внутренний
@@ -594,4 +594,25 @@ upgrade/repeat/check. Downgrade удаляет только новые поля 
 SIGKILL во время HTTP/восстановление lease, отмену с поздним ответом, остановку БД и
 возобновление обработки. Ожидания ограничены deadline и проверяют условие. Используются
 только собственные случайные Compose project/порты/volume; удаляются только они.
-Миграции и seed остаются явными шагами до запуска worker.
+В smoke миграции и seed явно проверяются до worker; сервис migrate также использует
+временные читаемые копии seed для UID 10001, как backend. Общий docker compose up
+автоматически выполняет migrate по правилам PR #61.
+
+### Политика draft2 и транспорт проверок
+
+PR #59 обновил политику до 2026-10-22.draft2; интеграция B08 находится в main через #64.
+result_snapshot автоматически сохраняет requested_dscr, offer_dscr и data_gaps;
+отдельная миграция для новых полей dataclass не требуется.
+Старые отправки draft1 на процессе draft2 безопасно получают incompatible_policy.
+
+В draft2 чистый модуль допускает неизвестные налоговые/регистрационные флаги ФНС
+и умеет возвращать incomplete_checks. Сохранённый транспорт schema_version=1 из B07
+требует non-null tax_arrears/mass_address/director_disqualified; рабочие mocks им
+соответствуют. Пропуск/null такого поля остаётся техническим invalid_data. Для
+передачи подобных неполных отчётов требуется согласовать с рисками транспортную
+схему/версию; расширение не включается молча в существующий формат проверок.
+
+Диагностика конкурентного lookup B05 наблюдает PID именно двух участвующих API-пулов.
+Она не считает транзакции других TestClient в общей тестовой БД; оба lookup остаются
+за барьером до завершения наблюдений. Проверки отсутствия транзакций во время HTTP
+и единственной company identity сохранены.

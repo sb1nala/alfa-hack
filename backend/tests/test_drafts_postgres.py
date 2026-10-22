@@ -16,7 +16,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
-from sqlalchemy import func, select, text, update
+from sqlalchemy import event, func, select, text, update
 from sqlalchemy.exc import DBAPIError
 from test_auth_postgres import ORIGIN, SECRET, csrf, headers, in_database, login
 
@@ -652,6 +652,15 @@ def test_concurrent_lookup_has_one_identity_and_no_open_transaction_during_http(
     company = {**COMPANY, "inn": "0000000022"}
     barrier = Barrier(2)
 
+    pids = set()
+    engines = [c.app.state.engine.sync_engine for c in (actors.first, actors.second)]
+
+    def checkout(connection, record, proxy):
+        pids.add(connection.driver_connection.get_server_pid())
+
+    for engine in engines:
+        event.listen(engine, "checkout", checkout)
+
     def handler(request):
         # The application auth transaction must have ended before reaching the source.
         barrier.wait(timeout=5)
@@ -667,14 +676,18 @@ def test_concurrent_lookup_has_one_identity_and_no_open_transaction_during_http(
                         .select_from(text("pg_stat_activity"))
                         .where(
                             text(
-                                "datname = current_database() AND pid <> pg_backend_pid() "
+                                "datname = current_database() AND pid = ANY(:pids) "
                                 "AND state = 'idle in transaction'"
                             )
-                        )
+                        ),
+                        {"pids": list(pids)},
                     )
             finally:
                 await engine.dispose()
 
+        # Inspect only the two API pools under test. Other TestClient pools can
+        # still be closing a response from a preceding request in this shared DB.
+        assert len(pids) >= 2
         assert asyncio.run(active()) == 0
         # Keep both requests in HTTP until both observations finish; otherwise
         # one request's valid post-HTTP UPSERT can race the other's observation.
@@ -694,13 +707,17 @@ def test_concurrent_lookup_has_one_identity_and_no_open_transaction_during_http(
             client.app.state, "settings", actors.settings.model_copy(update={"egrul_timeout": 5})
         )
         monkeypatch.setattr(client.app.state, "registry", registry_client(async_handler))
-    with ThreadPoolExecutor(2) as executor:
-        results = list(
-            executor.map(
-                lambda c: c.get("/api/companies/lookup", params={"inn": company["inn"]}),
-                (actors.first, actors.second),
+    try:
+        with ThreadPoolExecutor(2) as executor:
+            results = list(
+                executor.map(
+                    lambda c: c.get("/api/companies/lookup", params={"inn": company["inn"]}),
+                    (actors.first, actors.second),
+                )
             )
-        )
+    finally:
+        for engine in engines:
+            event.remove(engine, "checkout", checkout)
     assert [r.status_code for r in results] == [200, 200]
 
     async def check(db):

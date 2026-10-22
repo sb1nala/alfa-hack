@@ -146,7 +146,14 @@ def main() -> None:
             shutil.copyfile(ROOT / source, staged)
             staged.chmod(0o444)
             mounts.append(f"{staged}:/seed/{target}:ro")
-        override_data = {"services": {"backend": {"volumes": mounts}, "mocks": {}}}
+        override_data = {
+            "services": {
+                "backend": {"volumes": mounts},
+                # PR #61 runs seed in a separate UID 10001 service before API/worker.
+                "migrate": {"volumes": mounts},
+                "mocks": {},
+            }
+        }
         # Optional corporate/proxy CA; never copied into the image.
         if ca_file := env.get("DOCKER_BUILD_CA"):
             override_data["services"]["backend"]["build"] = {"secrets": ["proxy_ca"]}
