@@ -1,6 +1,6 @@
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
@@ -24,6 +24,23 @@ class Settings(BaseSettings):
     auth_cookie_secure: bool = True
     mocks_base_url: str = "http://localhost:8001"
     egrul_timeout: float = Field(default=2.0, ge=0.1, le=10.0)
+
+    worker_poll_interval: float = Field(default=1, ge=0.05, le=60, allow_inf_nan=False)
+    worker_http_timeout: float = Field(default=3, ge=0.1, le=30, allow_inf_nan=False)
+    worker_attempt_timeout: float = Field(default=30, ge=1, le=300, allow_inf_nan=False)
+    worker_db_timeout: float = Field(default=5, ge=0.1, le=30, allow_inf_nan=False)
+    worker_lease_seconds: float = Field(default=45, ge=2, le=600, allow_inf_nan=False)
+    worker_max_attempts: int = Field(default=5, ge=1, le=20)
+    worker_retry_base: float = Field(default=2, ge=0.1, le=300, allow_inf_nan=False)
+    worker_retry_max: float = Field(default=30, ge=0.1, le=3600, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def validate_worker(self):
+        if self.worker_lease_seconds < self.worker_attempt_timeout + self.worker_db_timeout + 5:
+            raise ValueError("WORKER_LEASE_SECONDS must be >= ATTEMPT_TIMEOUT + DB_TIMEOUT + 5")
+        if self.worker_retry_base > self.worker_retry_max:
+            raise ValueError("WORKER_RETRY_BASE must be <= WORKER_RETRY_MAX")
+        return self
 
     def auth_secret(self) -> str:
         if self.auth_jwt_secret is None:

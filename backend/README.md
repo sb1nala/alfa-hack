@@ -1,9 +1,9 @@
 # Backend
 
 Python 3.12, FastAPI, async SQLAlchemy 2/asyncpg, PostgreSQL 16, Alembic, uv.
-B01–B06: авторизация, JWT-сессии, CSRF, роли, каталог продуктов, поиск компании через
+B01–B07: авторизация, JWT-сессии, CSRF, роли, каталог продуктов, поиск компании через
 локальный мок ЕГРЮЛ, черновики, submit/cancel, аудит и постоянные задания в PostgreSQL.
-После submit заявка остаётся SUBMITTED: worker B07 ещё не реализован.
+Отдельный worker B07 выполняет проверки и оставляет заявку в SCORING для B08.
 Банковские операции, файлы, история API и SSE пока возвращают `501` после проверок доступа.
 Контракт: `../docs/openapi.yaml`.
 
@@ -356,7 +356,7 @@ Docker-проверка создаёт случайный отдельный Com
 проверяет login → продукты → компанию → создание/PATCH черновика → submit → повтор →
 одно задание и аудит в БД → рестарт → повтор → cancel → аудит и отменённое задание.
 Также сохраняются проверки logout/JWT replay, отказа мока, UID и health при сбое БД.
-Это проверка постановки и отмены, не завершённый кредитный конвейер (worker отсутствует):
+Проверки worker B07 и ограничения кредитного сценария описаны ниже:
 
 ```bash
 uv run --locked python ../scripts/check_docker.py
@@ -371,3 +371,125 @@ DOCKER_BUILD_CA=/path/to/combined-ca.pem uv run --locked python ../scripts/check
 ```bash
 uv run --locked ruff format --check . ../scripts --extend-exclude app/decision
 ```
+
+## B07: отдельный worker проверок
+
+После явных миграций и seed (команды выше):
+
+```bash
+docker compose build backend mocks
+docker compose up -d --wait backend mocks
+docker compose up -d --scale worker=2 worker
+docker compose logs -f worker
+# Вне Docker из backend/:
+uv run --locked --env-file ../.env python -m app.worker
+```
+
+Worker и API используют один образ backend, Settings и async session factory.
+FastAPI не запускает worker; миграций/seed внутри worker нет. Нужен доступ только
+к PostgreSQL и локальному `MOCKS_BASE_URL`. Один процесс последовательно исполняет
+задания; несколько процессов безопасно разделяют очередь через SKIP LOCKED.
+После submit: SUBMITTED → CHECKING → **SCORING**, где обработка B07 останавливается.
+Это ещё не кредитное решение. decide(), решения и предложения — B08.
+
+| Переменная (секунды, кроме attempts) | Default | Допустимый диапазон |
+| --- | --- | --- |
+| `WORKER_POLL_INTERVAL` | 1 | 0.05–60 |
+| `WORKER_HTTP_TIMEOUT` | 3 | 0.1–30 на сетевую операцию |
+| `WORKER_ATTEMPT_TIMEOUT` | 30 | 1–300 на всю попытку |
+| `WORKER_DB_TIMEOUT` | 5 | 0.1–30 на SQL/ожидание блокировки |
+| `WORKER_LEASE_SECONDS` | 45 | 2–600; минимум attempt + db + 5 |
+| `WORKER_MAX_ATTEMPTS` | 5 | 1–20 |
+| `WORKER_RETRY_BASE` | 2 | 0.1–300, не больше retry_max |
+| `WORKER_RETRY_MAX` | 30 | 0.1–3600 |
+
+Все числа конечны и валидируются при старте, включая соотношения lease/backoff.
+HTTP выполняется последовательно одним переиспользуемым AsyncClient; общий deadline
+ограничивает и медленную потоковую передачу. Lease не продлевается: обычная попытка
+ограничена 30 секундами при lease 45. DB-транзакции дополнительно ограничены общим
+client-side timeout `WORKER_DB_TIMEOUT + DB_READINESS_TIMEOUT + 2`, включая commit;
+statement_timeout/lock_timeout действуют только в worker-транзакциях.
+SIGTERM/SIGINT прекращает polling после текущей ограниченной попытки; клиент и engine
+закрываются. Compose даёт 45 секунд на остановку при defaults. Если увеличиваете
+таймауты, увеличьте stop_grace_period локальным override. SIGKILL/авария оставляют
+running для восстановления по lease. Ошибка БД не считается успехом: supervisor
+логирует категорию и продолжает polling; задание восстанавливается по сроку lease.
+
+Временные network/timeout/429/5xx → pending с задержкой
+`min(retry_max, retry_base * 2^(attempts-1))`. Defaults: 2, 4, 8, 16 секунд между
+пятью попытками. Каждый захват, включая восстановление после падения, расходует
+попытку; если последний исполнитель погиб, следующий захват только фиксирует failed,
+HTTP сверх бюджета не выполняется. Каждая новая попытка заново запрашивает **все три
+источника**; частичные ответы в БД не сохраняются. Это простой согласованный набор
+одной попытки, без смешивания ответов разного возраста. Во время HTTP, backoff и
+polling нет открытой транзакции. Пустой polling не пишет аудит.
+
+Все поля риска обязательны, bool/int не преобразуются из строк, деньги — конечные
+неотрицательные строки с двумя знаками; ИНН обязан совпадать. Для ЕГРЮЛ проверяются
+известные статусы ACTIVE/LIQUIDATED/LIQUIDATING/BANKRUPT/INACTIVE, реальная дата и ОКВЭД.
+Валидный `pb.available=false` с nullable финансовыми данными передаётся дальше без
+подмены значений. Отсутствующие поля риска не получают благоприятных defaults.
+Автозаполнение B05 использует прежний отдельный адаптер и контракт.
+
+**Рабочее решение до согласования команды:** 404, несовпадение ИНН, повреждённый JSON,
+отсутствующие/некорректные поля и прочие постоянные HTTP-ошибки сразу дают техническое
+failed; заявка остаётся CHECKING. Исчерпание временных повторов тоже даёт failed.
+REJECTED не используется, кредитное решение не создаётся. В `pipeline_jobs` сохраняются
+только `last_error_stage/category`, без ответов/исключений/секретов. Логи содержат
+job/application/submission ID, попытку, этап и категорию. Не выводите ответы источников
+в публичные события, карточку, диагностические сообщения или логи.
+
+### Диагностика и повтор технически неуспешной проверки
+
+```bash
+docker compose logs --tail=100 worker
+docker compose exec db psql -U alfa_hack -d alfa_hack -c \
+  'SELECT id,application_id,submission_id,phase,state,attempts,available_at,lease_expires_at,last_error_stage,last_error_category FROM pipeline_jobs ORDER BY created_at DESC;'
+```
+
+Для своих значений POSTGRES_USER/DB замените аргументы psql. Сначала устраните причину:
+состояние mocks/db, доступность endpoints, формат данных, настройки timeout. Просмотрите
+аудит по application_id; переходы и запланированные повторы содержат submission/job,
+номер попытки и категорию. Не меняйте анкету/снимок задним числом, не делайте повторный
+submit и не переводите заявку в REJECTED.
+
+После устранения причины оператор может явно выдать новый ограниченный бюджет:
+
+```bash
+docker compose run --rm --no-deps backend python -m app.requeue UUID-ЗАДАНИЯ
+```
+
+Команда блокирует сначала заявку, затем задание и перечитывает их. Разрешён только
+failed/checks для актуальной отправки в CHECKING без сохранённых результатов.
+Одна транзакция пишет CHECKING → CHECKING и аудит operator_requeue с предыдущей
+ошибкой/attempts, повышает revision, сохраняет input_revision, сбрасывает attempts,
+lease/ошибку и делает тот же job pending сейчас. Она не создаёт второй job, не
+оживляет отменённую/устаревшую отправку и не забирает phase=decision. Гонки с cancel
+сериализуются теми же блокировками. Публичного API повторного запуска нет.
+
+### Хранение и передача B08
+
+`b07_worker_checks` добавляет `submission_checks` и phase/errors в pipeline_jobs.
+Один результат (PK submission_id, FK без CASCADE) содержит оригинальные проверенные
+JSONB egrul/pb/bki, schema_version=1 и created_at. Успех одной транзакцией сохраняет
+весь набор, SCORING/аудит и **тот же job**: phase=decision, state=pending, attempts=0,
+available_at=DB-now, обе lease=NULL. B07 выбирает только checks, поэтому готовое
+задание не повторяется. completed зарезервирован для завершения B08.
+
+B08 должен захватывать decision, читать неизменяемую отправку и submission_checks,
+проверять совместимость policy_version снимка, строить типы рисков из сохранённых
+ответов и вызывать decide() вне долгой транзакции. Перед записью: заявка → job,
+актуальные ссылки/input_revision, SCORING, running/свой действующий токен и phase.
+Решение, предложение, переход, аудит и completed — атомарно. Новый submit, повторные
+моки и ручная правка БД для продолжения не нужны. Свободная цель/словарь и совместимость
+версии политики остаются открытыми вопросами B08 из B06; risk-review не заменяет seed.
+
+### Проверка Docker B07
+
+`python ../scripts/check_docker.py` теперь сохраняет прежний B04–B06 smoke и добавляет
+два реальных worker, CHECKING → SCORING, три сохранённых ответа и единственный переход,
+рабочий demo-bki с двумя 503/аудированными повторами, SIGTERM/restart после commit,
+SIGKILL во время HTTP/восстановление lease, отмену с поздним ответом, остановку БД и
+возобновление обработки. Ожидания ограничены deadline и проверяют условие. Используются
+только собственные случайные Compose project/порты/volume; удаляются только они.
+Миграции и seed остаются явными шагами до запуска worker.

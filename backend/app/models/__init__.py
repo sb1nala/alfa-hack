@@ -331,6 +331,7 @@ class PipelineJob(Identity, CreatedAt, Base):
             name="lease_state",
         ),
         Index("ix_pipeline_jobs_ready", "state", "available_at", "id"),
+        Index("ix_pipeline_jobs_phase_ready", "phase", "state", "available_at", "id"),
         Index("ix_pipeline_jobs_application", "application_id"),
         Index("ix_pipeline_jobs_lease", "state", "lease_expires_at"),
     )
@@ -342,6 +343,11 @@ class PipelineJob(Identity, CreatedAt, Base):
         api_enum("job_state", "pending", "running", "completed", "cancelled", "failed"),
         server_default=text("'pending'"),
     )
+    phase: Mapped[str] = mapped_column(
+        api_enum("job_phase", "checks", "decision"), server_default=text("'checks'")
+    )
+    last_error_stage: Mapped[str | None]
+    last_error_category: Mapped[str | None]
     available_at: Mapped[datetime] = mapped_column(server_default=func.now())
     attempts: Mapped[int] = mapped_column(server_default=text("0"))
     lease_token: Mapped[UUID | None]
@@ -364,3 +370,17 @@ class SubmitIdempotency(Identity, CreatedAt, Base):
     response_status: Mapped[int]
     response_body: Mapped[dict[str, Any]] = mapped_column(JSONB)
     expires_at: Mapped[datetime] = mapped_column(index=True)
+
+
+class SubmissionChecks(CreatedAt, Base):
+    """One complete immutable set of validated source responses per submission."""
+
+    __tablename__ = "submission_checks"
+
+    submission_id: Mapped[UUID] = mapped_column(
+        ForeignKey("application_submissions.id"), primary_key=True
+    )
+    schema_version: Mapped[int] = mapped_column(server_default=text("1"))
+    egrul: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    pb: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    bki: Mapped[dict[str, Any]] = mapped_column(JSONB)

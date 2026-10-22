@@ -76,6 +76,16 @@ def database(request):
         finally:
             await engine.dispose()
 
+    async def job_columns():
+        engine = create_engine(settings)
+        try:
+            async with engine.connect() as connection:
+                return await connection.run_sync(
+                    lambda conn: {c["name"] for c in inspect(conn).get_columns("pipeline_jobs")}
+                )
+        finally:
+            await engine.dispose()
+
     async def legacy_data(insert=False):
         engine = create_engine(settings)
         try:
@@ -104,6 +114,14 @@ def database(request):
         asyncio.run(legacy_data(insert=True))
         migrate(settings, "upgrade", "head")
         asyncio.run(legacy_data())
+        migrate(settings, "upgrade", "head")
+        migrate(settings, "check")
+        migrate(settings, "downgrade", "b06_submit_queue")
+        assert "submission_checks" not in set(asyncio.run(tables()))
+        assert not {"phase", "last_error_stage", "last_error_category"} & asyncio.run(job_columns())
+        asyncio.run(legacy_data())
+        migrate(settings, "upgrade", "head")
+        migrate(settings, "check")
         migrate(settings, "downgrade", "b05_product_policy")
         assert not {"application_submissions", "pipeline_jobs", "submit_idempotency"} & set(
             asyncio.run(tables())
