@@ -169,8 +169,9 @@ def _scenario_manual(browser, pages):
         "QA: класс D, строительство — снижаем лимит до 5 млн ₽.")
     shot(bank, "manual-04-bank-decision-form")
     bank.get_by_role("button", name=T["bank"]["decision"]["submit"]).click()
-    expect(bank.get_by_text(T["bank"]["decision"]["done"])).to_be_visible(timeout=15_000)
-    shot(bank, "manual-05-bank-decision-saved")
+    # Подтверждение видно ~1,2 с, затем кабинет возвращается в очередь — ждём возврата.
+    bank.wait_for_url(re.compile(r"/bank/?$"), timeout=15_000)
+    shot(bank, "manual-05-bank-queue-after-decision")
     # Опрос статуса идёт только в видимой вкладке (refetchIntervalInBackground: false) —
     # на демо окна стоят рядом; в тесте возвращаем фокус клиенту.
     client.bring_to_front()
