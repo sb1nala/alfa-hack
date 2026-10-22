@@ -121,7 +121,7 @@ def scenario_bki(browser):
     page = new_page(browser, video=True)
     login(page, "demo-bki", PASSWORD)
     apply(page, COMPANIES["demo-bki"], "")
-    expect(page.get_by_text(T["statuses"]["CHECKING"]["slow"])).to_be_visible(timeout=30_000)
+    expect(page.get_by_text(T["statuses"]["CHECKING"]["slow"])).to_be_visible(timeout=30_000)  # #80 п.1
     shot(page, "demo-bki-checking-slow")
     wait_title(page, "APPROVED")
     shot(page, "demo-bki-decision-approved")
@@ -141,14 +141,16 @@ def scenario_manual(browser):
     bank.wait_for_url(re.compile(r"/bank/applications/"))
     bank.wait_for_load_state("networkidle")
     shot(bank, "manual-03-bank-card")
-    bank.get_by_label(T["bank"]["decision"]["counterOffer"]).check()
-    amount = bank.get_by_label(T["decision"]["terms"]["amount"])
-    amount.fill("5000000")
-    bank.get_by_label(T["decision"]["terms"]["term"]).fill("24")
-    reason = bank.get_by_label(T["counterOfferReasons"]["amount_reduced"])
+    form = bank.locator("div").filter(
+        has=bank.get_by_role("heading", name=T["bank"]["decision"]["title"], exact=True)).filter(
+        has=bank.get_by_role("button", name=T["bank"]["decision"]["submit"])).last
+    form.get_by_label(T["bank"]["decision"]["counterOffer"]).check()
+    form.get_by_label(T["decision"]["terms"]["amount"], exact=True).fill("5000000")
+    form.get_by_label(T["decision"]["terms"]["term"], exact=True).fill("24")
+    reason = form.get_by_label(T["counterOfferReasons"]["amount_reduced"])
     if reason.count():
         reason.first.check()
-    bank.get_by_label(T["bank"]["decision"]["auditCommentLabel"]).fill(
+    form.get_by_label(T["bank"]["decision"]["auditCommentLabel"]).fill(
         "QA: класс D, строительство — снижаем лимит до 5 млн ₽.")
     shot(bank, "manual-04-bank-decision-form")
     bank.get_by_role("button", name=T["bank"]["decision"]["submit"]).click()
