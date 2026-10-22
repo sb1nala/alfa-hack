@@ -1,0 +1,78 @@
+# QA: прогон «как жюри» на чистой машине. Временная ветка продукта/QA, в main не сливается без согласования с бэкендом.
+name: qa-e2e
+
+on:
+  push:
+    branches: ["qa/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: qa-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stand:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Быстрый старт — шаг 1 (README)
+        run: |
+          cp .env.example .env
+          secret=$(python3 -c "import secrets; print(secrets.token_urlsafe(48))")
+          sed -i "s|^AUTH_JWT_SECRET=.*|AUTH_JWT_SECRET=${secret}|" .env
+          docker version --format 'Docker {{.Server.Version}}'
+          docker compose version
+
+      - name: Быстрый старт — шаг 2 (README)
+        run: |
+          start=$(date +%s)
+          docker compose up --build --wait
+          echo "STAND_UP_SECONDS=$(( $(date +%s) - start ))" | tee -a "$GITHUB_ENV"
+          docker compose ps -a
+
+      - name: Быстрый старт — шаг 3 (адреса из README)
+        run: |
+          curl -fsS -o /dev/null -w "frontend %{http_code}\n" http://localhost:8080/
+          curl -fsS -o /dev/null -w "swagger  %{http_code}\n" http://localhost:8000/docs
+          curl -fsS -o /dev/null -w "mocks    %{http_code}\n" http://localhost:8001/docs
+          curl -fsS http://localhost:8000/health/ready; echo
+          docker compose ps -a --format '{{.Service}} {{.State}} {{.ExitCode}}' | tee services.txt
+
+      - name: Прогон сценариев через API (run_e2e.py)
+        run: python3 api-collection/run_e2e.py --markdown | tee e2e.txt
+
+      - name: Отказоустойчивость — БД (README, «Проверки и тесты»)
+        if: always()
+        run: |
+          set -x
+          curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/health/ready
+          docker compose stop db
+          sleep 3
+          curl -s -o /dev/null -w "ready=%{http_code}\n" http://localhost:8000/health/ready || true
+          curl -s -o /dev/null -w "live=%{http_code}\n" http://localhost:8000/health/live || true
+          docker compose start db
+          for i in $(seq 1 30); do code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health/ready); [ "$code" = 200 ] && break; sleep 2; done
+          echo "ready after restart=$code"
+
+      - name: Отчёт
+        if: always()
+        run: |
+          {
+            echo "## Прогон «как жюри»"
+            echo "Подъём стенда: ${STAND_UP_SECONDS:-?} с"
+            echo '```'; cat services.txt 2>/dev/null; echo '```'
+            echo '```'; cat e2e.txt 2>/dev/null; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          docker compose logs --no-color --timestamps > compose-logs.txt 2>&1 || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-e2e-logs
+          path: |
+            e2e.txt
+            services.txt
+            compose-logs.txt
+          retention-days: 7
