@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "policy_version": "2026-10-21.draft1",
+    "policy_version": "2026-10-22.draft2",
     "owner": "Риски и данные",
     "note": "Коды продуктов и целей — из docs/product/ui-texts.ru.json. Ставки условные, для прототипа."
   },

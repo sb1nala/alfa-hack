@@ -15,6 +15,8 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       strictPort: true,
+      // Тексты (docs/product) и лимиты продуктов (seed/) лежат вне frontend/.
+      fs: { allow: ['.', '../docs', '../seed'] },
       proxy: {
         '/api': {
           target: url.origin,

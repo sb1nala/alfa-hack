@@ -25,6 +25,7 @@ from app.decision.policy import (
     REVIEW_COLLATERAL,
     REVIEW_DOCUMENTS,
     REVIEW_GRAY_ZONE,
+    REVIEW_INCOMPLETE,
     REVIEW_REVENUE_MISMATCH,
     TAX_ARREARS_STOP,
     TERM_STEP_MONTHS,
@@ -61,16 +62,36 @@ def decide(
 ) -> Decision:
     if application.product_code not in PRODUCTS:
         raise ValueError(f"Unknown product: {application.product_code}")
+    if application.amount <= 0 or application.term_months <= 0:
+        # A malformed form is a validation error, not a credit-risk outcome.
+        raise ValueError("Amount and term must be positive")
 
     stop = _stop_factors(application, bki, egrul, pb)
     if stop:
         return _rejected(
-            stop, analytical=f"Стоп-факторы: {', '.join(stop)}. Скоринг не проводился."
+            stop,
+            analytical=f"Стоп-факторы: {', '.join(stop)} (статус ЕГРЮЛ: {egrul.status}). "
+            "Скоринг не проводился.",
         )
 
     sufficiency = _check_data(application, pb)
     if sufficiency is not None:
         return sufficiency
+
+    gaps = _data_gaps(pb)
+    if gaps:
+        return Decision(
+            outcome="MANUAL_REVIEW",
+            reasons=(),
+            explanation=texts.STATUS_DESCRIPTIONS["MANUAL_REVIEW"],
+            required_documents=(),
+            offer=None,
+            policy_version=POLICY_VERSION,
+            review_reason=REVIEW_INCOMPLETE,
+            data_gaps=gaps,
+            analytical_explanation=f"ФНС не вернула поля: {', '.join(gaps)}. "
+            "Без них оценка неполная — скоринг не проводился.",
+        )
 
     assert pb.revenue is not None and pb.expenses is not None  # guaranteed by _check_data
     fin = _Finances(
@@ -79,7 +100,10 @@ def decide(
         existing_monthly=float(bki.monthly_payments),
     )
     result = score(application, egrul, pb, bki, fin.revenue, fin.cash_flow)
-    summary = f"Класс {result.risk_class} ({result.score} баллов), DSCR {result.dscr:.2f}."
+    summary = (
+        f"Класс {result.risk_class} ({result.score} баллов), "
+        f"DSCR запроса {result.dscr:.2f} по базовой ставке."
+    )
 
     if result.risk_class not in AUTO_CLASSES:
         if result.risk_class == "D":
@@ -105,13 +129,13 @@ def _stop_factors(
     stop = []
     if egrul.status != "ACTIVE":
         stop.append("company_liquidating")
-    if pb.director_disqualified:
+    if pb.director_disqualified is True:
         stop.append("director_disqualified")
     if any(loan.current_overdue_days >= 90 for loan in bki.loans):
         stop.append("overdue_90_plus")
     if months_between(egrul.registration_date, application.submitted_on) < MIN_BUSINESS_AGE_MONTHS:
         stop.append("business_too_young")
-    if pb.tax_arrears > TAX_ARREARS_STOP:
+    if pb.tax_arrears is not None and pb.tax_arrears > TAX_ARREARS_STOP:
         stop.append("tax_debt")
     return tuple(stop)
 
@@ -122,19 +146,28 @@ def _check_data(application: ApplicationInput, pb: PbReport) -> Decision | None:
     needed: list[str] = []
     review: tuple[str, str] | None = None
 
-    if not pb.available or pb.revenue is None or pb.expenses is None:
+    tax_data_usable = (
+        pb.available
+        and pb.revenue is not None
+        and pb.expenses is not None
+        and pb.revenue > 0
+        and pb.expenses >= 0
+    )
+    declared = application.annual_revenue
+    if not tax_data_usable:
         document = "tax_return" if application.legal_form == "IP" else "financial_statements"
         if document in documents:
             review = (
                 REVIEW_DOCUMENTS,
-                "ФНС не вернула финансовые данные, клиент приложил документы.",
+                "ФНС не вернула пригодные финансовые данные, клиент приложил документы.",
             )
         else:
             needed.append(document)
-    elif application.annual_revenue is None:
+    if declared is None or declared <= 0:
         needed.append("annual_revenue")
-    elif pb.revenue > 0:
-        deviation = abs(application.annual_revenue - pb.revenue) / pb.revenue
+    elif tax_data_usable:
+        assert pb.revenue is not None
+        deviation = abs(declared - pb.revenue) / pb.revenue
         if deviation > REVENUE_DEVIATION_MAX:
             if "bank_statement_12m" in documents:
                 review = (
@@ -144,7 +177,7 @@ def _check_data(application: ApplicationInput, pb: PbReport) -> Decision | None:
             else:
                 needed += ["annual_revenue", "bank_statement_12m"]
 
-    if pb.mass_address and "lease_agreement" not in documents:
+    if pb.mass_address is True and "lease_agreement" not in documents:
         needed.append("lease_agreement")
 
     if needed:
@@ -171,6 +204,11 @@ def _check_data(application: ApplicationInput, pb: PbReport) -> Decision | None:
     return None
 
 
+def _data_gaps(pb: PbReport) -> tuple[str, ...]:
+    fields = ("tax_arrears", "mass_address", "director_disqualified")
+    return tuple(name for name in fields if getattr(pb, name) is None)
+
+
 def _terms(
     application: ApplicationInput,
     product: ProductRule,
@@ -184,7 +222,7 @@ def _terms(
     if _fits(product, amount, term, cls, fin):
         offer = _offer(product, application.amount, term, cls)
         return _with_offer(
-            "APPROVED", (), offer, result, f"{summary} Запрошенные условия проходят."
+            "APPROVED", (), offer, result, fin, f"{summary} Запрошенные условия проходят."
         )
 
     # 1. Same product and amount, longer term
@@ -196,6 +234,7 @@ def _terms(
                 ("term_extended",),
                 offer,
                 result,
+                fin,
                 f"{summary} На {term} мес. платёж не проходит, на {longer} мес. проходит.",
             )
 
@@ -214,6 +253,7 @@ def _terms(
                 reasons,
                 offer,
                 result,
+                fin,
                 f"{summary} Продукт {product.code} не проходит, подходит {code}.",
             )
 
@@ -223,7 +263,14 @@ def _terms(
     dscr_limit = finance.max_affordable(
         product.code, fin.cash_flow, fin.existing_monthly, rate, product.max_term_months
     )
-    reduced = _round_down(min(float(product.max_amount), revenue_limit, dscr_limit))
+    reduced = _round_down(
+        min(float(product.max_amount), float(application.amount), revenue_limit, dscr_limit)
+    )
+    # Rounding must not push the offer over a limit: step down until every check passes.
+    while reduced >= product.min_amount and not _fits(
+        product, float(reduced), product.max_term_months, cls, fin
+    ):
+        reduced -= AMOUNT_ROUNDING
     if reduced >= product.min_amount:
         offer = _offer(product, reduced, product.max_term_months, cls)
         return _with_offer(
@@ -231,6 +278,7 @@ def _terms(
             ("amount_reduced",),
             offer,
             result,
+            fin,
             f"{summary} Максимальная сумма по лимитам — {reduced:,.0f} ₽ "
             f"на {product.max_term_months} мес.",
         )
@@ -300,9 +348,11 @@ def _with_offer(
     reason_codes: tuple[str, ...],
     offer: OfferTerms,
     result: ScoreResult,
+    fin: _Finances,
     analytical: str,
 ) -> Decision:
     reasons = tuple(Reason(code, texts.COUNTER_OFFER_REASONS[code]) for code in reason_codes)
+    offer_dscr = finance.dscr(fin.cash_flow, fin.existing_monthly, float(offer.monthly_payment))
     explanation = (
         texts.STATUS_DESCRIPTIONS["APPROVED"]
         if outcome == "APPROVED"
@@ -316,7 +366,9 @@ def _with_offer(
         offer=offer,
         policy_version=POLICY_VERSION,
         **_bank_part(result),
-        analytical_explanation=analytical,
+        offer_dscr=_two_places(offer_dscr),
+        analytical_explanation=f"{analytical} DSCR предложения {offer_dscr:.2f} "
+        f"по ставке {offer.annual_rate_percent}%.",
     )
 
 
@@ -357,9 +409,15 @@ def _bank_part(result: ScoreResult) -> dict:
     return {
         "score": result.score,
         "risk_class": result.risk_class,
-        "dscr": Decimal(str(round(result.dscr, 2))) if math.isfinite(result.dscr) else None,
+        "requested_dscr": _two_places(result.dscr),
         "scoring_factors": result.factors,
     }
+
+
+def _two_places(value: float) -> Decimal | None:
+    if not math.isfinite(value):
+        return None
+    return Decimal(str(value)).quantize(_CENT, rounding=ROUND_HALF_UP)
 
 
 def _document(code: str) -> RequiredDocument:

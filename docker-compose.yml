@@ -20,7 +20,7 @@ services:
     image: ${COMPOSE_PROJECT_NAME:-alfa-hack}-backend
     build:
       context: ./backend
-    environment:
+    environment: &backend-env
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-alfa_hack}
@@ -31,11 +31,11 @@ services:
       AUTH_JWT_ISSUER: ${AUTH_JWT_ISSUER:-alfa-hack}
       AUTH_JWT_AUDIENCE: ${AUTH_JWT_AUDIENCE:-alfa-hack-web}
       AUTH_SESSION_HOURS: ${AUTH_SESSION_HOURS:-8}
-      AUTH_ALLOWED_ORIGIN: ${AUTH_ALLOWED_ORIGIN:-http://localhost:8000}
+      AUTH_ALLOWED_ORIGIN: ${AUTH_ALLOWED_ORIGIN:-http://localhost:${FRONTEND_PORT:-8080}}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
       MOCKS_BASE_URL: http://mocks:8000
       EGRUL_TIMEOUT: ${EGRUL_TIMEOUT:-2}
-    volumes:
+    volumes: &seed-volumes
       - ./seed/accounts.json:/seed/accounts.json:ro
       - ./seed/companies.json:/seed/companies.json:ro
       - ./seed/products.json:/seed/products.json:ro
@@ -43,14 +43,36 @@ services:
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=14)"]
       interval: 5s
       timeout: 15s
       retries: 3
       start_period: 5s
+
+  # One-shot: schema migrations and idempotent import of demo accounts, companies and
+  # products. backend and worker start only after it exits successfully, so
+  # `docker compose up` gives a ready stand without manual steps. Safe on every start.
+  migrate:
+    image: ${COMPOSE_PROJECT_NAME:-alfa-hack}-backend
+    build:
+      context: ./backend
+    command:
+      - sh
+      - -c
+      - >-
+        alembic upgrade head &&
+        python -m app.seed
+        --accounts /seed/accounts.json --companies /seed/companies.json
+        --products /seed/products.json --product-texts /seed/product-texts.json
+    environment: *backend-env
+    volumes: *seed-volumes
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
 
   worker:
     image: ${COMPOSE_PROJECT_NAME:-alfa-hack}-backend
@@ -75,8 +97,8 @@ services:
       WORKER_RETRY_MAX: ${WORKER_RETRY_MAX:-30}
     stop_grace_period: 45s
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       mocks:
         condition: service_healthy
 
@@ -91,6 +113,24 @@ services:
       - "127.0.0.1:${MOCKS_PORT:-8001}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 3s
+
+  frontend:
+    build:
+      context: ./frontend
+      additional_contexts:
+        docs: ./docs
+        seed: ./seed
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-8080}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
       interval: 5s
       timeout: 5s
       retries: 3
