@@ -1,7 +1,7 @@
 meta {
   name: Черновик для проверки версий
   type: http
-  seq: 8
+  seq: 9
 }
 
 post {
@@ -11,6 +11,7 @@ post {
 }
 
 headers {
+  Origin: {{origin}}
   X-CSRF-Token: {{csrf}}
 }
 

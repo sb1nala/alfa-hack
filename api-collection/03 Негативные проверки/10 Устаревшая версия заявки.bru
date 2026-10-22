@@ -1,7 +1,7 @@
 meta {
   name: Устаревшая версия заявки
   type: http
-  seq: 9
+  seq: 10
 }
 
 patch {
@@ -11,6 +11,7 @@ patch {
 }
 
 headers {
+  Origin: {{origin}}
   X-CSRF-Token: {{csrf}}
 }
 
