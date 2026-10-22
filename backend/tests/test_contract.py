@@ -138,6 +138,8 @@ def test_contract_structure_and_examples_per_operation(path, method, operation):
             "/api/underwriter/applications",
             "/api/underwriter/applications/{application_id}",
             "/api/underwriter/applications/{application_id}/decision",
+            "/api/applications/{application_id}/history",
+            "/api/applications/{application_id}/events",
         }
     )
     assert ("501" in operation["responses"]) == (not implemented)

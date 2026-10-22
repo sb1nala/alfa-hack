@@ -15,6 +15,7 @@ from app.dependencies import (
     accessible_application,
     owned_application,
 )
+from app.event_history import history_page
 from app.models import Application
 from app.schemas.applications import (
     AcceptOfferRequest,
@@ -392,17 +393,21 @@ async def sign(
     **endpoint(
         EventList,
         {"history": {"items": [ex.EVENT], "next_cursor": None}},
-        "Публичная история по возрастанию ревизии и внутренней последовательности событий. "
+        "Публичная история по внутренней sequence заявки, включая события одной revision. "
         "cursor — исключительная нижняя граница; next_cursor — для следующей страницы. "
+        "Неизвестный/чужой UUID — 404; 410 зарезервирован для подтверждённого истечения "
+        "после согласования хранения, очистки/TTL сейчас нет. "
         "Внутренние факторы, авторы банковских решений и сырые ответы моков исключены.",
         role="both",
         extra_errors=(410,),
         access=accessible_application,
+        implemented=True,
     ),
 )
 async def history(
     application_id: ApplicationID,
+    db: DBSession,
     cursor: Annotated[UUID | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> EventList:
-    not_implemented()
+    return await history_page(db, application_id, cursor, limit)
