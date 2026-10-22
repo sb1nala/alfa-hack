@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link as RouterLink, Outlet, useNavigate } from 'react-router-dom';
 import { api } from '../api/index.ts';
 import { useMe } from '../api/hooks.ts';
+import { closeApplicationStreams } from '../api/applicationLive.ts';
 import { t } from '../lib/texts.ts';
 
 export function AppLayout() {
@@ -12,6 +13,7 @@ export function AppLayout() {
   const user = me.data;
 
   async function logout() {
+    closeApplicationStreams();
     try {
       await api.auth.logout();
     } finally {
