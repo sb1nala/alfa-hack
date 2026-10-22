@@ -8,8 +8,97 @@ B01–B08: авторизация, JWT-сессии, CSRF, роли, катал�
 через [PR #64](https://github.com/sb1nala/alfa-hack/pull/64).
 B09 реализует публичную историю и SSE из сохранённых событий. Во время работы
 в main также слиты B11/#66 и B12/#67: документы, клиентские и банковские действия.
-Эти реализации сохранены; изменения B09 ограничены историей и SSE.
+Эти реализации сохранены. B10 добавляет проверки интеграции, а не бизнес-операции.
 Контракт: `../docs/openapi.yaml`.
+
+## B10: штатный запуск и воспроизводимая проверка
+
+**На main `4d77082` чистый запуск заблокирован [#76](https://github.com/sb1nala/alfa-hack/issues/76):**
+`frontend` падает на `api:check`, поскольку закоммиченные типы отстают от OpenAPI.
+Фронтендеру нужно выполнить `pnpm api:generate`, проверить `pnpm typecheck && pnpm build`
+и закоммитить результат. Отдельная зависимость — подключить EventSource вместо polling.
+B09/#69 слит, серверная часть готова; работающий тестовый EventSource не означает SSE в UI.
+Фактические результаты и ограничения: [B10-REPORT.md](B10-REPORT.md).
+
+Нужны Docker Engine с BuildKit, Compose v2 с `additional_contexts`, Git и Python 3.12
+(Python нужен для проверок, продукт работает в контейнерах). Из корня репозитория:
+
+```bash
+cp .env.example .env
+python3 -c 'import secrets; print(secrets.token_urlsafe(48))'
+# Вставьте результат в AUTH_JWT_SECRET в .env; задайте локальный POSTGRES_PASSWORD.
+docker compose up --build --wait
+docker compose ps -a
+```
+
+Ожидается: db/backend/mocks/frontend healthy, worker running, migrate Exited (0).
+У worker нет отдельного healthcheck; его обработку подтверждает сквозная заявка.
+При стандартных портах SPA — `http://localhost:8080`, API через nginx —
+`http://localhost:8080/api/auth/csrf`, диагностика backend — `http://localhost:8000/health/ready`.
+Миграции и seed выполняет migrate автоматически, ручной импорт не требуется.
+
+При занятом порте поменяйте FRONTEND_PORT/BACKEND_PORT/POSTGRES_PORT/MOCKS_PORT.
+Одновременно задайте AUTH_ALLOWED_ORIGIN **точно как адрес в браузере**:
+`localhost` и `127.0.0.1`, разные порты — разные origin. Для HTTP оставьте
+AUTH_COOKIE_SECURE=false. Отдельный COMPOSE_PROJECT_NAME изолирует сеть, тома и образ backend.
+Не публикуйте `.env`, `docker compose config` с подставленными секретами и cookie.
+
+Сохранение и повторный запуск:
+
+```bash
+docker compose down                  # данные и документы остаются в томах проекта
+docker compose up --build --wait     # тот же env/project, migrate/seed повторяются безопасно
+docker compose run --rm migrate      # явная повторная проверка импорта
+docker compose exec backend alembic current
+docker compose exec backend alembic check
+# Только для удаления СВОЕГО одноразового стенда вместе с данными:
+docker compose down --volumes
+```
+
+Полный интеграционный оркестратор использует исходные Dockerfile и `up --build --wait`,
+выбирает уникальный проект, свободные порты, новые секреты и новые тома. При ошибке
+сборки останавливается; типы не регенерирует, api:check не отключает. Нужны Node 24,
+Playwright 1.57.0 и Chromium (установка инструментов — в разделе B09 ниже):
+
+```bash
+PLAYWRIGHT_MODULE=/tmp/b09-browser-tools/node_modules/playwright \
+CHROMIUM_EXECUTABLE=/usr/bin/chromium \
+python3 scripts/check_product_docker.py
+```
+
+Он переиспользует `api-collection/run_e2e.py` для девяти компаний и негативных сценариев,
+дополняет его загрузкой/скачиванием PDF, точным порядком истории, повторной обработкой
+NEEDS_INFO, выдачей, down/up с сохранением томов, повторным migrate/seed и сбоем БД.
+Далее использует браузерный B09 EventSource с restart/recreate backend и сценарий
+рабочего UI: вход → подбор → анкета → отправка → решение → принятие → подписание → ISSUED.
+Вывод UI отдельно сообщает количество запросов `/events` и карточки. Успех API и
+браузерного транспорта сам по себе не закрывает зависимость SSE в рабочем интерфейсе.
+HTTP-сценарии идут через frontend/nginx; прямой backend используется только для health.
+
+На уже поднятом своём стенде можно отдельно запустить продуктовый прогон:
+
+```bash
+E2E_BASE_URL=http://localhost:8080 E2E_ORIGIN=http://localhost:8080 \
+E2E_MOCKS_URL=http://localhost:8001 python3 api-collection/run_e2e.py
+```
+
+Глубокие проверки двух worker, SIGKILL, lease/fencing, отмены и двух 503 БКИ
+остаются в `scripts/check_docker.py` и pytest; повторять их внутри оркестратора не нужно.
+Полный pytest с PostgreSQL и проверки Ruff/OpenAPI приведены ниже.
+
+Диагностика: `docker compose logs --tail 60 migrate backend worker` — миграции,
+seed, ошибки окружения и категории worker. Ready=503/live=200 при недоступной БД
+ожидаемы; после возврата PostgreSQL API/worker должны восстановиться. После recreate
+backend nginx обновляет Docker DNS до 10 секунд; браузерный EventSource после 502
+может стать CLOSED, и UI должен восстановить историю/карточку и создать новый поток.
+
+В облачной среде с HTTPS inspection сначала настройте доверие CA, не отключая TLS.
+Backend/mocks уже поддерживают необязательный BuildKit secret `proxy_ca`;
+`DOCKER_BUILD_CA` используется диагностическими скриптами, не штатным Compose.
+Frontend Dockerfile такого секрета пока не поддерживает: адаптация доверия к CA
+описана отдельно в отчёте и не считается исправлением #76. Режим файлов checkout
+должен соответствовать обычному Git checkout (0644 для JSON и nginx.conf), чтобы их
+читали UID 10001 и nginx. Проверки не требуют `chmod` чужих исходников или подмены seed.
 
 ## Настройки авторизации
 
@@ -750,12 +839,21 @@ PLAYWRIGHT_MODULE=/tmp/b09-browser-tools/node_modules/playwright \
 CHROMIUM_EXECUTABLE=/usr/bin/chromium \
 DOCKER_BUILD_CA=/path/to/combined-ca.pem \
 uv run --locked python ../scripts/check_sse_docker.py
+# Только диагностика при открытом #76: временная регенерация типов,
+# НЕ доказательство чистой сборки; дополнительно продуктовый API/документы/сохранность:
+PLAYWRIGHT_MODULE=/tmp/b09-browser-tools/node_modules/playwright \
+CHROMIUM_EXECUTABLE=/usr/bin/chromium \
+DOCKER_BUILD_CA=/path/to/combined-ca.pem \
+uv run --locked python ../scripts/check_sse_docker.py --allow-stale-types --product-checks
+# Для отдельного повтора только рабочего UI с теми же переменными:
+# uv run --locked python ../scripts/check_sse_docker.py --allow-stale-types --ui-only
 ```
 
 DOCKER_BUILD_CA и CHROMIUM_EXECUTABLE необязательны, если стандартного доверия и
 установленного Playwright browser достаточно. Скрипт создаёт собственные project,
 порты, синтетическую БД, volume и временный frontend build context. В этой копии
-API-типы регенерируются, исходный nginx сохраняется; CA передаётся BuildKit secret,
+API-типы регенерируются только с явным `--allow-stale-types` (диагностика #76,
+не чистый запуск), исходный nginx сохраняется; CA передаётся BuildKit secret,
 loopback healthcheck wget выполняется без внешнего прокси и через IPv4. Это
 адаптация окружения проверки, не изменение frontend/nginx в репозитории.
 Проверка использует настоящий Chromium EventSource с cookie через frontend/nginx,
