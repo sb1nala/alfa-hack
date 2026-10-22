@@ -6,12 +6,13 @@ import {
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link as RouterLink, Navigate, useParams } from 'react-router-dom';
 import { api, ApiProtocolError } from '../../api/index.ts';
-import { keys, productById, useApplication, useProducts, type ClientApplication, type Product } from '../../api/hooks.ts';
+import { keys, productById, useApplication, useProducts, type ClientApplication } from '../../api/hooks.ts';
+import { DecisionBlock } from '../../components/client/DecisionBlock.tsx';
 import { ApplicationTimeline } from '../../components/ApplicationTimeline.tsx';
 import { ErrorAlert } from '../../components/ErrorAlert.tsx';
 import { StatusChip, statusColor } from '../../components/StatusChip.tsx';
 import { formatRub } from '../../lib/format.ts';
-import { fill, productTexts, statusTexts, t } from '../../lib/texts.ts';
+import { productTexts, statusTexts, t } from '../../lib/texts.ts';
 
 const SLOW_CHECKING_MS = 10_000;
 
@@ -47,8 +48,9 @@ export function ApplicationPage() {
       </Paper>
 
       <StatusCard application={app} />
-      {app.decision && <DecisionSummary application={app} products={products.data} />}
-      <CancelAction application={app} />
+      <DecisionBlock application={app} products={products.data} />
+      {/* Отказ от предложения — в блоке решения, со своим подтверждением */}
+      {app.status !== 'APPROVED' && app.status !== 'COUNTER_OFFER' && <CancelAction application={app} />}
     </Stack>
   );
 }
@@ -83,95 +85,6 @@ function useSlowStatus(status: ClientApplication['status']): boolean {
     return () => window.clearInterval(timer);
   }, [status]);
   return status === 'CHECKING' && now - since > SLOW_CHECKING_MS;
-}
-
-/**
- * Итог решения только для чтения. Действия — принять, отказаться, дополнить данные —
- * добавляет экран решения (#14), когда бэкенд реализует accept-offer, additional-info и sign.
- */
-function DecisionSummary({ application, products }: { application: ClientApplication; products?: Product[] }) {
-  const decision = application.decision;
-  if (!decision) return null;
-  const offer = 'offer' in decision ? decision.offer : null;
-  const offeredProduct = offer ? productById(products, offer.terms.product_id) : undefined;
-
-  return (
-    <Paper variant="outlined" sx={{ p: { xs: 2.5, md: 3.5 } }}>
-      <Stack spacing={2}>
-        {offer && (
-          <Stack spacing={1}>
-            <Typography variant="subtitle1" component="h3" sx={{ fontWeight: 600 }}>{t.decision.offered}</Typography>
-            <TermsRow label={t.decision.terms.product}
-              value={offeredProduct ? productTexts(offeredProduct.code)?.name ?? offeredProduct.name : '—'} />
-            <TermsRow label={t.decision.terms.amount} value={formatRub(offer.terms.amount)} />
-            <TermsRow label={t.decision.terms.term} value={`${offer.terms.term_months} ${t.common.months}`} />
-            <TermsRow
-              label={t.decision.terms.rate}
-              value={offer.terms.annual_rate_percent
-                ? fill(t.decision.terms.rateValue, { rate: offer.terms.annual_rate_percent.replace('.', ',') })
-                : t.decision.terms.rateTbd}
-            />
-          </Stack>
-        )}
-
-        {decision.outcome === 'COUNTER_OFFER' && decision.reasons.length > 0 && (
-          <Stack spacing={0.5}>
-            <Typography variant="subtitle1" component="h3" sx={{ fontWeight: 600 }}>
-              {t.decision.counterOffer.whyTitle}
-            </Typography>
-            {decision.reasons.map((reason) => (
-              <Typography key={reason.code}>
-                {(t.counterOfferReasons as Record<string, string>)[reason.code] ?? reason.message}
-              </Typography>
-            ))}
-          </Stack>
-        )}
-
-        {decision.outcome === 'REJECTED' && decision.reasons.map((reason) => {
-          const known = (t.rejectionReasons as unknown as Record<string, { message: string; advice: string }>)[reason.code];
-          return (
-            <Stack key={reason.code} spacing={1}>
-              <Typography variant="subtitle1" component="h3" sx={{ fontWeight: 600 }}>{t.decision.rejected.reasonTitle}</Typography>
-              <Typography>{known?.message ?? reason.message}</Typography>
-              {known?.advice && (
-                <>
-                  <Typography variant="subtitle1" component="h3" sx={{ fontWeight: 600 }}>{t.decision.rejected.adviceTitle}</Typography>
-                  <Typography>{known.advice}</Typography>
-                </>
-              )}
-            </Stack>
-          );
-        })}
-
-        {decision.outcome === 'NEEDS_INFO' && (
-          <Stack spacing={1}>
-            <Typography variant="subtitle1" component="h3" sx={{ fontWeight: 600 }}>{t.decision.needsInfo.listTitle}</Typography>
-            {decision.required_documents.map((doc) => (
-              <Box key={doc.code}>
-                <Typography sx={{ fontWeight: 500 }}>{doc.title}</Typography>
-                <Typography variant="body2" color="text.secondary">{t.decision.needsInfo.why}: {doc.explanation}</Typography>
-              </Box>
-            ))}
-          </Stack>
-        )}
-
-        {decision.outcome === 'REJECTED' && (
-          <Button component={RouterLink} to="/client/new" variant="contained" sx={{ alignSelf: 'flex-start' }}>
-            {t.decision.rejected.newApplication}
-          </Button>
-        )}
-      </Stack>
-    </Paper>
-  );
-}
-
-function TermsRow({ label, value }: { label: string; value: string }) {
-  return (
-    <Stack direction="row" spacing={2}>
-      <Typography color="text.secondary" sx={{ minWidth: 160 }}>{label}</Typography>
-      <Typography sx={{ fontWeight: 500 }}>{value}</Typography>
-    </Stack>
-  );
 }
 
 function CancelAction({ application }: { application: ClientApplication }) {

@@ -8,6 +8,7 @@ import { ApplicationFormPage } from '../pages/client/ApplicationFormPage';
 import { ApplicationPage } from '../pages/client/ApplicationPage';
 import { ApplicationsPage } from '../pages/client/ApplicationsPage';
 import { NewApplicationPage } from '../pages/client/NewApplicationPage';
+import { SignPage } from '../pages/client/SignPage';
 import { useMe } from '../api/hooks';
 import { homeOf, RequireRole } from './RequireRole';
 
@@ -23,6 +24,10 @@ export function App() {
         <Route
           path="client/applications/:id"
           element={<RequireRole role="client"><ApplicationPage /></RequireRole>}
+        />
+        <Route
+          path="client/applications/:id/sign"
+          element={<RequireRole role="client"><SignPage /></RequireRole>}
         />
         <Route
           path="client/applications/:id/edit"
