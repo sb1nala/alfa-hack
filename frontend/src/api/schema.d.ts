@@ -394,8 +394,6 @@ export interface paths {
         /**
          * Queue
          * @description Банковская очередь. По умолчанию MANUAL_REVIEW; фильтр status, пагинация offset/limit. Сортировка updated_at ASC, id ASC. Доступ только underwriter.
-         *
-         *     Бизнес-заглушка: 501 после проверок доступа.
          */
         get: operations["queue_api_underwriter_applications_get"];
         put?: never;
@@ -416,8 +414,6 @@ export interface paths {
         /**
          * Bank Card
          * @description Банковская карточка: клиентские данные + история решений с внутренними факторами и аналитическим объяснением. Никогда не использовать её схему в клиентском API.
-         *
-         *     Бизнес-заглушка: 501 после проверок доступа.
          */
         get: operations["bank_card_api_underwriter_applications__application_id__get"];
         put?: never;
@@ -439,9 +435,7 @@ export interface paths {
         put?: never;
         /**
          * Manual Decision
-         * @description Ручное решение только из MANUAL_REVIEW: APPROVED, COUNTER_OFFER, NEEDS_INFO или REJECTED. Повторный MANUAL_REVIEW не является переходом в текущем документе. expected_revision обязателен. Решение добавляется в историю, старое не перезаписывается. explanation — клиенту, analytical_explanation — только банку.
-         *
-         *     Бизнес-заглушка: 501 после проверок доступа.
+         * @description Ручное решение только из MANUAL_REVIEW: APPROVED, COUNTER_OFFER, NEEDS_INFO или REJECTED. Повторный MANUAL_REVIEW не является переходом в текущем документе. expected_revision обязателен. Решение добавляется в историю, старое не перезаписывается. explanation — клиенту, analytical_explanation — только банку. Для APPROVED/COUNTER_OFFER product_id должен ссылаться на активный продукт (иначе 422); предложение сохраняется со снимком продукта. Автор решения — текущий underwriter.
          */
         post: operations["manual_decision_api_underwriter_applications__application_id__decision_post"];
         delete?: never;
@@ -3524,9 +3518,10 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Будущий успешный ответ (после проверок доступа пока 501) */
+            /** @description Успешный ответ */
             200: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     [name: string]: unknown;
                 };
                 content: {
@@ -3536,6 +3531,7 @@ export interface operations {
             /** @description Некорректный запрос */
             400: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3546,6 +3542,7 @@ export interface operations {
             /** @description Требуется вход */
             401: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3556,6 +3553,7 @@ export interface operations {
             /** @description Недостаточно прав или неверный CSRF-токен */
             403: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3566,6 +3564,7 @@ export interface operations {
             /** @description Ресурс не найден или недоступен этому владельцу */
             404: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3576,6 +3575,7 @@ export interface operations {
             /** @description Некорректные параметры запроса */
             422: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3586,6 +3586,7 @@ export interface operations {
             /** @description Слишком много запросов */
             429: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3596,16 +3597,7 @@ export interface operations {
             /** @description Внутренняя ошибка */
             500: {
                 headers: {
-                    "X-Request-ID"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Контракт определён; бизнес-операция пока не реализована */
-            501: {
-                headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3626,9 +3618,10 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Будущий успешный ответ (после проверок доступа пока 501) */
+            /** @description Успешный ответ */
             200: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     [name: string]: unknown;
                 };
                 content: {
@@ -3638,6 +3631,7 @@ export interface operations {
             /** @description Некорректный запрос */
             400: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3648,6 +3642,7 @@ export interface operations {
             /** @description Требуется вход */
             401: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3658,6 +3653,7 @@ export interface operations {
             /** @description Недостаточно прав или неверный CSRF-токен */
             403: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3668,6 +3664,7 @@ export interface operations {
             /** @description Ресурс не найден или недоступен этому владельцу */
             404: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3678,6 +3675,7 @@ export interface operations {
             /** @description Некорректные параметры запроса */
             422: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3688,6 +3686,7 @@ export interface operations {
             /** @description Слишком много запросов */
             429: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3698,16 +3697,7 @@ export interface operations {
             /** @description Внутренняя ошибка */
             500: {
                 headers: {
-                    "X-Request-ID"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Контракт определён; бизнес-операция пока не реализована */
-            501: {
-                headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3732,9 +3722,10 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Будущий успешный ответ (после проверок доступа пока 501) */
+            /** @description Успешный ответ */
             200: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     [name: string]: unknown;
                 };
                 content: {
@@ -3744,6 +3735,7 @@ export interface operations {
             /** @description Некорректный запрос */
             400: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3754,6 +3746,7 @@ export interface operations {
             /** @description Требуется вход */
             401: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3764,6 +3757,7 @@ export interface operations {
             /** @description Недостаточно прав или неверный CSRF-токен */
             403: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3774,6 +3768,7 @@ export interface operations {
             /** @description Ресурс не найден или недоступен этому владельцу */
             404: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3784,6 +3779,7 @@ export interface operations {
             /** @description Конфликт состояния, ревизии или ключа идемпотентности */
             409: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3794,6 +3790,7 @@ export interface operations {
             /** @description Некорректные параметры запроса */
             422: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3804,6 +3801,7 @@ export interface operations {
             /** @description Слишком много запросов */
             429: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -3814,16 +3812,7 @@ export interface operations {
             /** @description Внутренняя ошибка */
             500: {
                 headers: {
-                    "X-Request-ID"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Контракт определён; бизнес-операция пока не реализована */
-            501: {
-                headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
