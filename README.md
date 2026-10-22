@@ -93,7 +93,15 @@ docker compose down
    - Чтобы показать сбой ещё раз: `curl -X POST http://localhost:8001/admin/reset`.
 5. **Остальные исходы:** `demo-term`, `demo-amount`, `demo-product`, `demo-info`, `demo-stop`, `demo-risk`.
 
-Полные сценарии с ожидаемыми результатами по шагам, включая проверки безопасности и аудита, — в [`docs/test-scenarios.md`](docs/test-scenarios.md). Те же сценарии через API — в коллекции [`api-collection/`](api-collection/README.md).
+Все исходы можно проверить и без браузера, одной командой (нужен только Python 3.10+):
+
+```bash
+python3 api-collection/run_e2e.py
+```
+
+Скрипт проводит заявки всех 9 компаний через API, сверяет исходы с ожидаемыми, доводит их до выдачи или решения аналитика и печатает ✅/❌ по каждой.
+
+Полные сценарии с ожидаемыми результатами по шагам, включая проверки безопасности и аудита, — в [`docs/test-scenarios.md`](docs/test-scenarios.md). Те же сценарии через API вручную — в коллекции [`api-collection/`](api-collection/README.md).
 
 ## Возможности
 
@@ -277,8 +285,8 @@ docker compose start db                      # readiness восстанавли�
 | Диаграмма состояний заявки | [`docs/application-states.md`](docs/application-states.md) | ✅ |
 | Модель данных | [`docs/data-model.md`](docs/data-model.md) | ✅ |
 | Тестовые сценарии | [`docs/test-scenarios.md`](docs/test-scenarios.md) | ✅ |
-| Live-статус по SSE в кабинете | backend [PR #69](https://github.com/sb1nala/alfa-hack/pull/69) | ⏳ TODO (@Бэкенд, @Фронтенд): поток реализован в PR #69, кабинет пока обновляет статус опросом |
+| Live-статус по SSE в кабинете | backend [PR #69](https://github.com/sb1nala/alfa-hack/pull/69) | ⏳ TODO (@Фронтенд): поток на бэкенде готов и слит, кабинет пока обновляет статус опросом |
 | ML-модель challenger для аналитика | [#35](https://github.com/sb1nala/alfa-hack/issues/35) | ⏳ TODO (@Риски): опционально, на решение не влияет |
-| Прогон «как жюри» на чистой машине | [журнал](docs/test-scenarios.md#прогон-как-жюри) | ⏳ TODO (@Продукт) |
+| Прогон «как жюри» на чистой машине | [журнал](docs/test-scenarios.md#прогон-как-жюри) | ⏳ 22.10: логика 10/10, сборка стенда — блокер [#76](https://github.com/sb1nala/alfa-hack/issues/76) (@Фронтенд) |
 
 Если репозиторий приватный, доступ нужно выдать аккаунту жюри `alfa-hack-2026`.
