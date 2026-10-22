@@ -155,8 +155,12 @@ def scenario_manual(browser):
     shot(bank, "manual-04-bank-decision-form")
     bank.get_by_role("button", name=T["bank"]["decision"]["submit"]).click()
     expect(bank.get_by_text(T["bank"]["decision"]["done"])).to_be_visible(timeout=15_000)
+    shot(bank, "manual-05-bank-decision-saved")
+    # Опрос статуса идёт только в видимой вкладке (refetchIntervalInBackground: false) —
+    # на демо окна стоят рядом; в тесте возвращаем фокус клиенту.
+    client.bring_to_front()
     wait_title(client, "COUNTER_OFFER", timeout=30_000)
-    shot(client, "manual-05-client-sees-counter-offer")
+    shot(client, "manual-06-client-sees-counter-offer")
     bank.context.close()
     client.context.close()
 
