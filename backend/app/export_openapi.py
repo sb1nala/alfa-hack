@@ -27,7 +27,8 @@ def main() -> None:
             parser.exit(1, f"OpenAPI is out of date: {args.output}\n")
     else:
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(rendered, encoding="utf-8")
+        # LF on every OS: docs/openapi.yaml is compared byte-for-byte (see .gitattributes)
+        args.output.write_text(rendered, encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":

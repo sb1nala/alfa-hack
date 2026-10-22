@@ -1,0 +1,7 @@
+# Files compared byte-for-byte with generated output must keep LF on every OS
+# (Git for Windows checks out CRLF by default):
+# - frontend `pnpm build` (also in the Docker image) runs `openapi-typescript --check`
+#   against src/api/schema.d.ts;
+# - backend tests compare docs/openapi.yaml with a fresh export.
+frontend/src/api/schema.d.ts text eol=lf
+docs/openapi.yaml text eol=lf

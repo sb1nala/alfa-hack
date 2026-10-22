@@ -44,22 +44,24 @@ JWT содержит sub, role, sid, iat, exp, iss, aud. Сервер на ка�
 
 ## Миграции
 
-Из корня репозитория, с настроенным `.env` по `.env.example`:
+`docker compose up -d --build` из корня репозитория (с `.env` по `.env.example`) поднимает готовый стенд сам: одноразовый сервис `migrate` применяет `alembic upgrade head` и идемпотентно импортирует аккаунты, компании и продукты из `seed/`, после чего завершается с кодом 0. `backend` и `worker` стартуют только после этого (`service_completed_successfully`). Повторный `up` безопасен: импорт пишет `unchanged`.
+
+Вручную — те же шаги по отдельности:
 
 ```bash
 docker compose up -d --wait db
 docker compose build backend mocks
 docker compose run --rm backend alembic upgrade head
 docker compose run --rm backend alembic check
-docker compose run --rm backend python -m app.seed \
-  --accounts /seed/accounts.json --companies /seed/companies.json \
-  --products /seed/products.json --product-texts /seed/product-texts.json
+docker compose run --rm backend python -m app.seed   --accounts /seed/accounts.json --companies /seed/companies.json   --products /seed/products.json --product-texts /seed/product-texts.json
 docker compose up -d --wait backend mocks
 ```
 
+В Git Bash на Windows перед командами с путями `/seed/...` задайте `MSYS_NO_PATHCONV=1`, иначе Git Bash превратит их в пути Windows и импорт не найдёт файлы.
+
 Образ содержит Alembic и миграции, работает от пользователя `app` (UID 10001).
-Старт API не запускает миграции и не вызывает `create_all`. Healthchecks и Swagger
-`http://localhost:8000/docs` сохранены. Автоматизация миграций стенда — этап B10.
+Сам API миграции не запускает и `create_all` не вызывает — это делает сервис `migrate`. Healthchecks и Swagger
+`http://localhost:8000/docs` сохранены.
 
 Локально (PostgreSQL уже запущена):
 
