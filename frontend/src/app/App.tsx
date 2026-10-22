@@ -1,8 +1,9 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from '../components/AppLayout';
-import { BankPage } from '../pages/BankPage';
 import { LoginPage } from '../pages/LoginPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
+import { BankApplicationPage } from '../pages/bank/BankApplicationPage';
+import { BankQueuePage } from '../pages/bank/BankQueuePage';
 import { ApplicationFormPage } from '../pages/client/ApplicationFormPage';
 import { ApplicationPage } from '../pages/client/ApplicationPage';
 import { ApplicationsPage } from '../pages/client/ApplicationsPage';
@@ -27,7 +28,11 @@ export function App() {
           path="client/applications/:id/edit"
           element={<RequireRole role="client"><ApplicationFormPage /></RequireRole>}
         />
-        <Route path="bank" element={<RequireRole role="underwriter"><BankPage /></RequireRole>} />
+        <Route path="bank" element={<RequireRole role="underwriter"><BankQueuePage /></RequireRole>} />
+        <Route
+          path="bank/applications/:id"
+          element={<RequireRole role="underwriter"><BankApplicationPage /></RequireRole>}
+        />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
