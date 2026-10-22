@@ -55,6 +55,8 @@ def build_inputs(submission, checks):
             or form.purpose is None
             or not submission.consent_to_checks
             or submission.submitted_at.tzinfo is None
+            or not isinstance(submission.document_types, list)
+            or not all(isinstance(item, str) for item in submission.document_types)
         ):
             raise ValueError("incomplete submission")
         code = compatible_product(submission.product_snapshot)
@@ -81,8 +83,7 @@ def build_inputs(submission, checks):
                 annual_revenue=(Decimal(form.annual_revenue) if form.annual_revenue else None),
                 legal_form=form.company.legal_form,
                 submitted_on=submission.submitted_at.astimezone(UTC).date(),
-                # B08 supports primary submissions only; documents arrive in B11.
-                document_types=frozenset(),
+                document_types=frozenset(submission.document_types),
             ),
             BkiReport.from_dict(reports["bki"]),
             EgrulReport.from_dict(reports["egrul"]),

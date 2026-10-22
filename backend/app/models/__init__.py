@@ -321,6 +321,8 @@ class ApplicationSubmission(Identity, Base):
     product_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)
     consent_to_checks: Mapped[bool]
     submitted_at: Mapped[datetime]
+    # Types of documents attached at this input version; decide() reads only these.
+    document_types: Mapped[list[str]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
 
 
 class PipelineJob(Identity, CreatedAt, Base):

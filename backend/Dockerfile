@@ -13,7 +13,8 @@ RUN --mount=type=secret,id=proxy_ca \
 FROM python:3.12-slim-bookworm AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/app/.venv/bin:$PATH"
 WORKDIR /app
-RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app
+RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app \
+    && mkdir -p /data/documents && chown app:app /data/documents
 COPY --from=builder /app/.venv /app/.venv
 COPY --chown=app:app app ./app
 COPY --chown=app:app alembic.ini ./alembic.ini

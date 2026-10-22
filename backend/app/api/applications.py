@@ -5,7 +5,7 @@ from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Requ
 from sqlalchemy import func, select, true
 from sqlalchemy.orm import aliased
 
-from app import drafts, submissions
+from app import client_actions, drafts, submissions
 from app.api import examples as ex
 from app.api.contract import endpoint, not_implemented
 from app.dependencies import (
@@ -270,6 +270,7 @@ async def cancel_application(
         "expected_revision обязателен; чужое/устаревшее предложение или неверный статус — 409.",
         mutation=True,
         access=owned_application,
+        implemented=True,
     ),
 )
 async def accept_offer(
@@ -282,8 +283,15 @@ async def accept_offer(
             )
         ),
     ],
+    db: DBSession,
+    principal: ClientPrincipal,
+    request: Request,
 ) -> ClientApplication:
-    not_implemented()
+    result = await client_actions.accept_offer(
+        db, application_id, body, principal, request.state.request_id
+    )
+    await db.commit()
+    return result
 
 
 @router.post(
@@ -300,10 +308,13 @@ async def accept_offer(
         },
         "Дополнительные данные: NEEDS_INFO → CHECKING. Документы предварительно загружаются, "
         "document_ids должны принадлежать этой заявке. expected_revision — после загрузок. "
-        "Последнее решение сохраняется до появления нового.",
+        "annual_revenue, если передана, заменяет выручку в анкете. Создаётся новая версия "
+        "входов: в проверку попадают типы всех документов заявки, задание конвейера "
+        "ставится той же транзакцией. Последнее решение сохраняется до появления нового.",
         mutation=True,
         status_code=202,
         access=owned_application,
+        implemented=True,
     ),
 )
 async def additional_info(
@@ -322,8 +333,15 @@ async def additional_info(
             )
         ),
     ],
+    db: DBSession,
+    principal: ClientPrincipal,
+    request: Request,
 ) -> ClientApplication:
-    not_implemented()
+    result = await client_actions.additional_info(
+        db, application_id, body, principal, request.state.request_id
+    )
+    await db.commit()
+    return result
 
 
 @router.post(
@@ -331,19 +349,21 @@ async def additional_info(
     **endpoint(
         ClientApplication,
         {
-            "signed": {
+            "issued": {
                 **ex.APPLICATION_EXAMPLES["approved"],
-                "status": "SIGNED",
-                "revision": 7,
+                "status": "ISSUED",
+                "revision": 8,
                 "allowed_actions": [],
                 "accepted_offer_id": ex.OFFER_ID,
             }
         },
-        "Симуляция подписания: OFFER_ACCEPTED → SIGNED. offer_id должен совпадать с принятым. "
-        "Выдача SIGNED → ISSUED — будущая системная операция, отдельный клиентский "
-        "endpoint не нужен.",
+        "Симуляция подписания: OFFER_ACCEPTED → SIGNED клиентом, затем в той же транзакции "
+        "системная симуляция выдачи SIGNED → ISSUED. Ответ — карточка в ISSUED, оба перехода "
+        "в аудите. offer_id должен совпадать с принятым; иначе, как и при неверном статусе "
+        "или ревизии, — 409.",
         mutation=True,
         access=owned_application,
+        implemented=True,
     ),
 )
 async def sign(
@@ -356,8 +376,15 @@ async def sign(
             )
         ),
     ],
+    db: DBSession,
+    principal: ClientPrincipal,
+    request: Request,
 ) -> ClientApplication:
-    not_implemented()
+    result = await client_actions.sign(
+        db, application_id, body, principal, request.state.request_id
+    )
+    await db.commit()
+    return result
 
 
 @router.get(

@@ -181,6 +181,10 @@ uv run --locked --env-file ../.env python -m app.seed \
 Compose монтирует все четыре источника read-only. Как и accounts, они должны
 читаться UID 10001; для checkout с режимом 0600 используйте временные читаемые копии.
 `MOCKS_BASE_URL` локально — `http://localhost:8001`, внутри Compose — `http://mocks:8000`.
+`DOCUMENTS_DIR` — каталог файлов документов (B11), в Compose — именованный том
+`documents_data` в `/data/documents`, владелец UID 10001. Принимаются только PDF, JPEG и PNG
+до `DOCUMENT_MAX_BYTES` (по умолчанию 10 МБ, как в интерфейсе; nginx пропускает до 11 МБ).
+Тип определяется по первым байтам файла; в API и БД нет путей, только случайный ключ.
 `EGRUL_TIMEOUT=2` ограничивает весь запрос и HTTP I/O (0.1–10 секунд). Поиск всегда
 обращается к `/egrul/{inn}` локального мока, исключает status/director из публичного
 ответа. Только 404 источника превращается в `200 {"company": null}`. Таймаут, сбой,

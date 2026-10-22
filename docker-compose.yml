@@ -35,7 +35,9 @@ services:
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
       MOCKS_BASE_URL: http://mocks:8000
       EGRUL_TIMEOUT: ${EGRUL_TIMEOUT:-2}
-    volumes: &seed-volumes
+      DOCUMENTS_DIR: /data/documents
+    volumes:
+      - documents_data:/data/documents
       - ./seed/accounts.json:/seed/accounts.json:ro
       - ./seed/companies.json:/seed/companies.json:ro
       - ./seed/products.json:/seed/products.json:ro
@@ -68,7 +70,11 @@ services:
         --accounts /seed/accounts.json --companies /seed/companies.json
         --products /seed/products.json --product-texts /seed/product-texts.json
     environment: *backend-env
-    volumes: *seed-volumes
+    volumes:
+      - ./seed/accounts.json:/seed/accounts.json:ro
+      - ./seed/companies.json:/seed/companies.json:ro
+      - ./seed/products.json:/seed/products.json:ro
+      - ./docs/product/ui-texts.ru.json:/seed/product-texts.json:ro
     restart: "no"
     depends_on:
       db:
@@ -138,3 +144,4 @@ services:
 
 volumes:
   postgres_data:
+  documents_data:

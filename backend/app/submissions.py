@@ -8,7 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import drafts
+from app import documents, drafts
 from app.dependencies import Principal
 from app.models import Application, ApplicationSubmission, PipelineJob, Product, SubmitIdempotency
 from app.schemas.applications import CancelRequest, ClientApplication, SubmitRequest
@@ -97,6 +97,7 @@ async def submit(
         product_snapshot=application.product_snapshot,
         consent_to_checks=True,
         submitted_at=application.updated_at,
+        document_types=await documents.types(db, application),
     )
     db.add(submission)
     await db.flush()
