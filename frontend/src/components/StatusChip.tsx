@@ -21,12 +21,12 @@ export function statusColor(status: ApplicationStatus): ChipProps['color'] {
   }
 }
 
-export function StatusChip({ status }: { status: ApplicationStatus }) {
+export function StatusChip({ status, bank = false }: { status: ApplicationStatus; bank?: boolean }) {
   const color = statusColor(status);
   return (
     <Chip
       size="small"
-      label={statusTexts(status).timeline}
+      label={bank ? statusTexts(status).bank : statusTexts(status).timeline}
       color={color}
       variant={color === 'default' ? 'outlined' : 'filled'}
       sx={color === 'default' ? undefined : {

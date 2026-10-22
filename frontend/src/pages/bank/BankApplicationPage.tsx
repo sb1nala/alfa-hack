@@ -9,9 +9,9 @@ import { productById, useProducts } from '../../api/hooks.ts';
 import { DecisionForm } from '../../components/bank/DecisionForm.tsx';
 import { ErrorAlert } from '../../components/ErrorAlert.tsx';
 import { StatusChip } from '../../components/StatusChip.tsx';
-import { riskClassFrom, scoreFromFactors } from '../../lib/bankDecision.ts';
+import { riskClassColor, riskClassFrom, scoreFromFactors } from '../../lib/bankDecision.ts';
 import { formatDate, formatRub } from '../../lib/format.ts';
-import { productTexts, statusTexts, t } from '../../lib/texts.ts';
+import { productTexts, t } from '../../lib/texts.ts';
 
 /** Экран 9 (screen-map.md): карточка заявки для аналитика и форма решения. */
 export function BankApplicationPage() {
@@ -35,8 +35,7 @@ export function BankApplicationPage() {
         <Button component={RouterLink} to="/bank" size="small" sx={{ mb: 1 }}>← {t.bank.queue.title}</Button>
         <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}>
           <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>{app.company_name ?? '—'}</Typography>
-          <StatusChip status={app.status} />
-          <Typography color="text.secondary">{statusTexts(app.status).bank}</Typography>
+          <StatusChip status={app.status} bank />
         </Stack>
       </Box>
 
@@ -90,8 +89,10 @@ export function BankApplicationPage() {
             {latest && (
               <Section title={t.bank.card.systemRecommendation}>
                 <Stack spacing={1}>
-                  <StatusChip status={latest.public.outcome} />
-                  <Typography>{latest.public.explanation}</Typography>
+                  <StatusChip status={latest.public.outcome} bank />
+                  {/* review_reason is not exposed by BankDecision yet; keep the bank-only explanation. */}
+                  <Typography>{latest.public.outcome === 'MANUAL_REVIEW'
+                    ? latest.analytical_explanation : latest.public.explanation}</Typography>
                 </Stack>
               </Section>
             )}
@@ -114,11 +115,15 @@ export function BankApplicationPage() {
 function Scoring({ decision }: { decision: BankDecision }) {
   const score = scoreFromFactors(decision.scoring_factors);
   const riskClass = riskClassFrom(decision.analytical_explanation);
+  const riskColor = riskClassColor(riskClass ?? '');
   return (
     <Stack spacing={2}>
       <Stack direction="row" spacing={1}>
         {score !== null && <Chip label={`${t.bank.card.score}: ${score}`} />}
-        {riskClass && <Chip color="secondary" label={`${t.bank.card.riskClass}: ${riskClass}`} />}
+        {riskClass && <Chip color={riskColor} label={`${t.bank.card.riskClass}: ${riskClass}`}
+          sx={riskColor === 'default'
+            ? { bgcolor: '#F8F6F9', color: 'text.primary' }
+            : { bgcolor: `${riskColor}.light`, color: riskClass === 'D' ? '#592000' : `${riskColor}.dark` }} />}
       </Stack>
       <Table size="small" aria-label={t.bank.card.factors}>
         <TableHead>

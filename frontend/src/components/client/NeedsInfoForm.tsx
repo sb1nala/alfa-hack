@@ -105,6 +105,7 @@ export function NeedsInfoForm({ application, documents }: { application: ClientA
           </Typography>
           {doc.code === REVENUE_ITEM ? (
             <TextField
+              fullWidth
               size="small"
               label={t.form.annualRevenue.label}
               value={revenue}

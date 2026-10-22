@@ -133,3 +133,14 @@ export function scoreFromFactors(factors: ScoringFactor[]): number | null {
 export function riskClassFrom(analytical: string): string | null {
   return /Класс\s+([A-E])\b/.exec(analytical)?.[1] ?? null;
 }
+
+/** docs/product/design-tokens.md: risk must not look like a positive outcome. */
+export function riskClassColor(riskClass: string): 'success' | 'default' | 'warning' | 'error' {
+  switch (riskClass) {
+    case 'A':
+    case 'B': return 'success';
+    case 'D': return 'warning';
+    case 'E': return 'error';
+    default: return 'default';
+  }
+}
