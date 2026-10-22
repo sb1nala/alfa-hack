@@ -264,6 +264,7 @@ const compose = (...args) =>
     console.log(
       "PASS backend recreation, nginx DNS recovery, native Last-Event-ID, onopen card, continued live delivery, saved replay",
     );
+    await require("./check_ui_browser.cjs")(browser, cfg);
   } finally {
     await browser.close();
   }

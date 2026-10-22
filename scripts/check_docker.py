@@ -47,11 +47,12 @@ def main() -> None:
     env["AUTH_JWT_SECRET"] = secrets.token_urlsafe(48)
     env["AUTH_ALLOWED_ORIGIN"] = f"http://127.0.0.1:{env['BACKEND_PORT']}"
     env["AUTH_COOKIE_SECURE"] = "false"
+    env["COMPOSE_PROJECT_NAME"] = f"alfa-b08-check-{uuid4().hex[:10]}"
     compose = [
         "docker",
         "compose",
         "--project-name",
-        f"alfa-b08-check-{uuid4().hex[:10]}",
+        env["COMPOSE_PROJECT_NAME"],
         "--env-file",
         str(ROOT / ".env.example"),
         "-f",
