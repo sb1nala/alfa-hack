@@ -3,6 +3,8 @@
 import importlib
 import io
 import json
+import shlex
+import subprocess
 import sys
 from pathlib import Path
 
@@ -52,9 +54,42 @@ def test_diagnostics_filter_credentials_and_preserve_useful_failure(
     monkeypatch.setattr(sys, "argv", ["ci_reports.py", str(raw), "--safe-copy", str(safe)])
     reports.main()
     reports.audit_reports(artifacts)
+    monkeypatch.setattr(sys, "stdin", io.StringIO(payload))
+    monkeypatch.setattr(sys, "argv", ["ci_reports.py", "-", "--stream", "--safe-copy", str(safe)])
+    reports.main()
+    assert safe.read_text().count("omitted") == 6
+    assert "Generated types are not up-to-date!" in safe.read_text()
+    reports.audit_reports(artifacts)
     safe.write_text("session=opaque\n")
     with pytest.raises(SystemExit, match="upload denied"):
         reports.audit_reports(artifacts)
+
+
+def test_streaming_pipeline_retains_test_failure(ci_tools, tmp_path, monkeypatch):
+    secret = "temporary-ci-credential-123456"
+    monkeypatch.setenv("POSTGRES_PASSWORD", secret)
+    output = tmp_path / "safe.txt"
+    producer = shlex.join(
+        [
+            sys.executable,
+            "-c",
+            "import os, sys; print(os.environ['POSTGRES_PASSWORD']); "
+            "print('FAILED synthetic test'); sys.exit(23)",
+        ]
+    )
+    reporter = shlex.join(
+        [sys.executable, ci_tools[0].__file__, "-", "--stream", "--safe-copy", str(output)]
+    )
+    result = subprocess.run(
+        ["bash", "-o", "pipefail", "-c", producer + " | " + reporter],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert result.returncode == 23
+    assert secret not in result.stdout + result.stderr + output.read_text()
+    assert "FAILED synthetic test" in result.stdout
+    assert result.stdout == output.read_text()
 
 
 @pytest.mark.parametrize(

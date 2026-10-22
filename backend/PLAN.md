@@ -3,7 +3,7 @@
 > Обновлено: 22 октября 2026. Проверяемый main —
 > [`d1de96c`](https://github.com/sb1nala/alfa-hack/commit/d1de96c).
 > **B01–B09, B11 и B12 — Готово; B10 — На ревью (строгий прогон после #85 зелёный).**
-> **B13 — На ревью: Backend checks и Clean Docker product прошли после #85.**
+> **B13 — В работе / Draft:** на повторе `12fe47a` backend job отменён; исправляется диагностика и проверяется полный повтор. Успех code commit `1b3732d` сохранён в отчёте.
 > Основание: [#77](https://github.com/sb1nala/alfa-hack/issues/77).
 > PR #58 и код B08 из коммита 333cc6c
 > фактически слиты; B08 включён владельцем в [PR #64](https://github.com/sb1nala/alfa-hack/pull/64).
@@ -78,7 +78,7 @@ B05 явно импортирует 10 аккаунтов, 9 компаний и
 | B10 | На ревью | Строгий оркестратор, API, EventSource, UI и сохранность; [отчёт](B10-REPORT.md) | #76 исправлен в #83, SSE включён в #85; строгий CI PASS | [PR #82 слит](https://github.com/sb1nala/alfa-hack/pull/82); #8 закрыт ранее, часть #9 |
 | B11 | Готово | Предложения, документы, дополнительные данные; подписание и симуляция выдачи из B12 | B08; форматы рисков | [PR #66](https://github.com/sb1nala/alfa-hack/pull/66) |
 | B12 | Готово | Очередь, банковская карточка и ручные решения (подписание и выдача — в B11) | B08, B11 | [PR #67](https://github.com/sb1nala/alfa-hack/pull/67), слит в ветку B11 |
-| B13 | На ревью | PR/push/manual CI, полный PostgreSQL pytest, строгий Docker/nginx; [отчёт B13](B13-REPORT.md) | Оба jobs PASS на 1b3732d после #85; ревью и branch protection тимлида | [PR #84](https://github.com/sb1nala/alfa-hack/pull/84); [#77](https://github.com/sb1nala/alfa-hack/issues/77), #9 |
+| B13 | В работе | PR/push/manual CI, полный PostgreSQL pytest, строгий Docker/nginx; [отчёт B13](B13-REPORT.md) | Оба jobs PASS на 1b3732d после #85; ревью и branch protection тимлида | [PR #84](https://github.com/sb1nala/alfa-hack/pull/84); [#77](https://github.com/sb1nala/alfa-hack/issues/77), #9 |
 
 ### B03. Модели БД и Alembic — готово
 
@@ -464,9 +464,10 @@ risk_class, requested_dscr/offer_dscr, data_gaps, стоп-факторы, revie
 - **Файлы:** `backend/app/api/underwriting.py`, сервисы ручных решений и оформления, тесты.
 - **Готовность:** клиенту запрещены банковские операции; сохраняются автор, объяснения и аудит; повтор команды не дублирует выдачу. Банковскую часть можно реализовать 22.10 до документов B11; оформление — после принятия предложения.
 
-### B13. Техническая готовность к сдаче — На ревью
+### B13. Техническая готовность к сдаче — В работе
 
-- **Статус:** [PR #84](https://github.com/sb1nala/alfa-hack/pull/84) — На ревью. После включения #85 оба jobs [Actions 39838447107](https://github.com/sb1nala/alfa-hack/actions/runs/39838447107) на `1b3732d` прошли: backend 556 tests без skips, product — чистая сборка, API 10/10, persistence, серверный EventSource и SSE рабочего React UI. [B13-REPORT.md](B13-REPORT.md) сохраняет предыдущие красные результаты и границы QA-приёмки.
+- **Текущий повтор:** `12fe47a` — product PASS, backend cancelled после почти 20 минут pytest. PR возвращён в Draft. Исправлен построчный безопасный вывод pytest, критерии и timeout сохранены; повтор выполняется. История и диагностика — в B13-REPORT.md.
+- **Предыдущий проверенный результат:** [PR #84](https://github.com/sb1nala/alfa-hack/pull/84) — На ревью. После включения #85 оба jobs [Actions 39838447107](https://github.com/sb1nala/alfa-hack/actions/runs/39838447107) на `1b3732d` прошли: backend 556 tests без skips, product — чистая сборка, API 10/10, persistence, серверный EventSource и SSE рабочего React UI. [B13-REPORT.md](B13-REPORT.md) сохраняет предыдущие красные результаты и границы QA-приёмки.
 - **Результат:** независимый backend job и строгий product job без обхода #76, актуальный OpenAPI, команды и ограничения для документации продукта. Проверки добавляются в каждом PR, а не откладываются до B13.
 - **Вход:** [Issue #77](https://github.com/sb1nala/alfa-hack/issues/77), существующая
   QA-ветка `qa/e2e-stand`, команды B10. CI не реализуется повторно внутри B10.

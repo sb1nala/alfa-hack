@@ -76,13 +76,12 @@ jobs:
         run: uv run --locked python -m app.export_openapi --check
       - name: Full pytest with PostgreSQL and migration roundtrips
         working-directory: backend
+        shell: bash
         run: |
-          result=0
-          uv run --locked pytest -q --run-postgres --junitxml="$RUNNER_TEMP/pytest.xml" \
-            > "$RUNNER_TEMP/pytest.log" 2>&1 || result=$?
-          python ../scripts/ci_reports.py "$RUNNER_TEMP/pytest.log" --safe-copy ../artifacts/backend/pytest-output.txt
-          cat ../artifacts/backend/pytest-output.txt
-          exit "$result"
+          set -o pipefail
+          uv run --locked pytest -vv --run-postgres -o faulthandler_timeout=60 \
+            --junitxml="$RUNNER_TEMP/pytest.xml" 2>&1 \
+            | python ../scripts/ci_reports.py - --stream --safe-copy ../artifacts/backend/pytest-output.txt
       - name: No unexpectedly skipped tests
         run: python scripts/ci_reports.py "$RUNNER_TEMP/pytest.xml" --check-pytest
       - name: Prepare safe failure report

@@ -17,7 +17,7 @@ B09 реализует публичную историю и SSE из сохра�
 Оба jobs [Actions после #85](https://github.com/sb1nala/alfa-hack/actions/runs/39838447107)
 прошли на `1b3732d`: чистая сборка, API 10/10, persistence, серверный EventSource
 и рабочий SPA до ISSUED без reload. React открыл успешный EventSource
-(1 запрос, 11 GET карточки). B10/B13 — **На ревью** в [PR #84](https://github.com/sb1nala/alfa-hack/pull/84).
+(1 запрос, 11 GET карточки). B10 — **На ревью**; повтор B13 после отмены backend job диагностируется в [PR #84](https://github.com/sb1nala/alfa-hack/pull/84).
 Граница smoke сохраняется: восстановление самого React UI при потере сети/CLOSED/502
 проверяется QA отдельно от тестового серверного EventSource.
 Исторические результаты: [B10-REPORT.md](B10-REPORT.md); текущие CI: [B13-REPORT.md](B13-REPORT.md).
@@ -178,7 +178,10 @@ Playwright использует свой соответствующий Chromium
 При сбое во вкладке Actions доступны `backend-diagnostics` (фильтрованный JUnit
 как текст) и `product-diagnostics` (ход сборки, traceback, последние 150 строк
 Compose и состояние сервисов, если Docker уже их создал); хранение 7 дней.
-Основной результат каждого шага — в job logs. Синтаксис отдельно проверяется
+Основной результат каждого шага — в job logs. Полный pytest выводится построчно
+через фильтр секретов; `-vv` показывает текущий тест, а `faulthandler_timeout=60`
+печатает traceback долгого теста. Это диагностика, критерии pytest не меняются;
+`pipefail` не позволяет успешному фильтру скрыть ошибку тестов. Синтаксис отдельно проверяется
 `actionlint` 1.7.12; валидный YAML и локальный запуск не означают успешные Actions.
 Реальные результаты B13 и ссылки — [B13-REPORT.md](B13-REPORT.md).
 

@@ -3,6 +3,7 @@
 import argparse
 import os
 import re
+import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -43,20 +44,34 @@ def audit_reports(directory):
     print("PASS diagnostic artifact credential audit")
 
 
+def copy_report(lines, destination, *, echo=False):
+    secrets = [v for k, v in os.environ.items() if re.search("PASSWORD|SECRET|TOKEN", k)]
+    secrets += ["demo-2026", "analyst-2026"]
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with destination.open("w") as output:
+        for line in lines:
+            clean = safe_line(line, secrets)
+            output.write(clean)
+            output.flush()
+            if echo:
+                print(clean, end="", flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("report", type=Path)
     parser.add_argument("--check-pytest", action="store_true")
     parser.add_argument("--safe-copy", type=Path)
     parser.add_argument("--audit", action="store_true")
+    parser.add_argument("--stream", action="store_true", help="Filter stdin live into --safe-copy")
     args = parser.parse_args()
-    if args.safe_copy:
-        secrets = [v for k, v in os.environ.items() if re.search("PASSWORD|SECRET|TOKEN", k)]
-        secrets += ["demo-2026", "analyst-2026"]
-        args.safe_copy.parent.mkdir(parents=True, exist_ok=True)
-        args.safe_copy.write_text(
-            "".join(safe_line(line, secrets) for line in args.report.read_text().splitlines(True))
-        )
+    if args.stream:
+        if not args.safe_copy:
+            parser.error("--stream requires --safe-copy")
+        copy_report(sys.stdin, args.safe_copy, echo=True)
+    elif args.safe_copy:
+        with args.report.open() as source:
+            copy_report(source, args.safe_copy)
     if args.check_pytest:
         check_pytest(args.report)
     if args.audit:
