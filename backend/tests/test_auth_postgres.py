@@ -490,6 +490,13 @@ def test_all_business_routes_check_access(client, account, resources, monkeypatc
         if path.endswith("/cancel"):
             expected = 200
             kwargs["json"] = {"expected_revision": 2}
+        if path.endswith(("/accept-offer", "/additional-info", "/sign")):
+            expected = 409  # Examples target other statuses/revisions of this application.
+        if path.endswith("/documents"):
+            # The example upload is text/plain: rejected by content before any lock.
+            expected = 415 if method == "post" else 200
+        if path.endswith("/download"):
+            expected = 404  # The fixture row has no stored blob; B11 tests cover content.
         if role not in roles:
             expected = 403
         elif account == SECOND and "{application_id}" in path:
