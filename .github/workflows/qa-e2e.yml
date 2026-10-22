@@ -96,6 +96,7 @@ jobs:
             e2e.txt
             ui.txt
             qa/screenshots/
+            qa/video/
             services.txt
             compose-logs.txt
           retention-days: 7

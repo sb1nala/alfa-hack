@@ -23,7 +23,17 @@ COMPANIES = {c["client_login"]: c for c in json.loads((ROOT / "seed/companies.js
 PASSWORD = "demo-2026"
 DECISION_TIMEOUT = 90_000
 
+VIDEO = ROOT / "qa/video"
+VIEWPORT = {"width": 1280, "height": 800}
+
 results: list[tuple[str, bool, str]] = []
+
+
+def new_page(browser, video=False) -> Page:
+    options = {"viewport": VIEWPORT, "locale": "ru-RU"}
+    if video:
+        options |= {"record_video_dir": str(VIDEO), "record_video_size": VIEWPORT}
+    return browser.new_context(**options).new_page()
 
 
 def shot(page: Page, name: str):
@@ -77,7 +87,7 @@ def step(name: str, fn):
 
 
 def scenario_approve(browser):
-    page = browser.new_page(viewport={"width": 1280, "height": 900}, locale="ru-RU")
+    page = new_page(browser, video=True)
     page.goto(f"{BASE}/login")
     shot(page, "01-login")
     login(page, "demo-approve", PASSWORD)
@@ -93,38 +103,38 @@ def scenario_approve(browser):
     page.get_by_role("button", name=T["signing"]["sign"]).click()
     wait_title(page, "ISSUED", timeout=30_000)
     shot(page, "approve-07-issued")
-    page.close()
+    page.context.close()
 
 
 def scenario_outcome(browser, login_name: str, status: str):
-    page = browser.new_page(viewport={"width": 1280, "height": 900}, locale="ru-RU")
+    page = new_page(browser)
     login(page, login_name, PASSWORD)
     apply(page, COMPANIES[login_name], "")
     wait_title(page, status)
     shot(page, f"{login_name}-decision-{status.lower()}")
-    page.close()
+    page.context.close()
 
 
 def scenario_bki(browser):
     import urllib.request
     urllib.request.urlopen(urllib.request.Request("http://localhost:8001/admin/reset", method="POST"), timeout=5)
-    page = browser.new_page(viewport={"width": 1280, "height": 900}, locale="ru-RU")
+    page = new_page(browser, video=True)
     login(page, "demo-bki", PASSWORD)
     apply(page, COMPANIES["demo-bki"], "")
     expect(page.get_by_text(T["statuses"]["CHECKING"]["slow"])).to_be_visible(timeout=30_000)
     shot(page, "demo-bki-checking-slow")
     wait_title(page, "APPROVED")
     shot(page, "demo-bki-decision-approved")
-    page.close()
+    page.context.close()
 
 
 def scenario_manual(browser):
-    client = browser.new_page(viewport={"width": 1280, "height": 900}, locale="ru-RU")
+    client = new_page(browser, video=True)
     login(client, "demo-manual", PASSWORD)
     apply(client, COMPANIES["demo-manual"], "")
     wait_title(client, "MANUAL_REVIEW")
     shot(client, "manual-01-client-waiting")
-    bank = browser.new_context(viewport={"width": 1280, "height": 900}, locale="ru-RU").new_page()
+    bank = new_page(browser, video=True)
     login(bank, "analyst", "analyst-2026")
     shot(bank, "manual-02-bank-queue")
     bank.get_by_role("row").filter(has_text=COMPANIES["demo-manual"]["company"]["name"]).first.click()
@@ -145,20 +155,21 @@ def scenario_manual(browser):
     expect(bank.get_by_text(T["bank"]["decision"]["done"])).to_be_visible(timeout=15_000)
     wait_title(client, "COUNTER_OFFER", timeout=30_000)
     shot(client, "manual-05-client-sees-counter-offer")
+    bank.context.close()
+    client.context.close()
 
 
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        context = browser.new_context()
-        step("TS-01 одобрение → подписание → выдача (UI)", lambda: scenario_approve(context))
-        step("TS-06 ручная проверка: клиент ↔ аналитик (UI)", lambda: scenario_manual(context))
+        step("TS-01 одобрение → подписание → выдача (UI)", lambda: scenario_approve(browser))
+        step("TS-06 ручная проверка: клиент ↔ аналитик (UI)", lambda: scenario_manual(browser))
         for login_name, status in [("demo-term", "COUNTER_OFFER"), ("demo-amount", "COUNTER_OFFER"),
                                    ("demo-product", "COUNTER_OFFER"), ("demo-info", "NEEDS_INFO"),
                                    ("demo-stop", "REJECTED"), ("demo-risk", "REJECTED")]:
             step(f"{login_name}: экран {status} (UI)",
-                 lambda ln=login_name, st=status: scenario_outcome(browser.new_context(), ln, st))
-        step("TS-09 сбой БКИ: «отвечает дольше обычного» → одобрение (UI)", lambda: scenario_bki(browser.new_context()))
+                 lambda ln=login_name, st=status: scenario_outcome(browser, ln, st))
+        step("TS-09 сбой БКИ: «отвечает дольше обычного» → одобрение (UI)", lambda: scenario_bki(browser))
         browser.close()
     failed = [r for r in results if not r[1]]
     print(f"\nUI: {len(results) - len(failed)}/{len(results)} прошли, скриншоты: {OUT}")
