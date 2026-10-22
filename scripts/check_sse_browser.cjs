@@ -32,19 +32,26 @@ const compose = (...args) =>
     await page.goto(cfg.origin, { waitUntil: "networkidle", timeout: 30000 });
     const app = await page.evaluate(async (record) => {
       window.call = async (path, body, extra = {}) => {
-        const r = await fetch("/api/" + path, {
-          method: body ? "POST" : "GET",
-          headers: body
-            ? {
-                "Content-Type": "application/json",
-                "X-CSRF-Token": window.csrf,
-                ...extra,
-              }
-            : {},
-          body: body ? JSON.stringify(body) : undefined,
-        });
-        if (!r.ok) throw Error(path + ": " + r.status);
-        return r.json();
+        const deadline = Date.now() + 20000;
+        while (true) {
+          const r = await fetch("/api/" + path, {
+            method: body ? "POST" : "GET",
+            headers: body
+              ? {
+                  "Content-Type": "application/json",
+                  "X-CSRF-Token": window.csrf,
+                  ...extra,
+                }
+              : {},
+            body: body ? JSON.stringify(body) : undefined,
+          });
+          if (r.ok) return r.json();
+          // A recreated backend can leave different nginx workers with different
+          // DNS cache ages. Recover idempotent reads with a bounded backoff.
+          if (body || r.status < 500 || Date.now() >= deadline)
+            throw Error(path + ": " + r.status);
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
       };
       window.csrf = (await call("auth/csrf")).csrf_token;
       await call("auth/login", {
@@ -206,16 +213,21 @@ const compose = (...args) =>
       app.id,
       { timeout: 30000, polling: 500 },
     );
-    await page.evaluate(async (id) => {
-      await call("applications/" + id + "/history");
-      if (source.readyState === EventSource.CLOSED) {
-        source.close();
-        connect();
-      }
-    }, app.id);
-    await page.waitForFunction(() => opens >= 3 && cards.length >= 3, null, {
-      timeout: 15000,
-    });
+    await page.evaluate(
+      (id) => call("applications/" + id + "/history"),
+      app.id,
+    );
+    await page.waitForFunction(
+      () => {
+        if (source.readyState === EventSource.CLOSED) {
+          source.close();
+          connect();
+        }
+        return opens >= 3 && cards.length >= 3;
+      },
+      null,
+      { timeout: 30000, polling: 500 },
+    );
     await page.evaluate(async (id) => {
       const c = await call("applications/" + id);
       await call("applications/" + id + "/cancel", {

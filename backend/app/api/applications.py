@@ -7,7 +7,7 @@ from sqlalchemy.orm import aliased
 
 from app import client_actions, drafts, submissions
 from app.api import examples as ex
-from app.api.contract import endpoint, not_implemented
+from app.api.contract import endpoint
 from app.dependencies import (
     ApplicationID,
     ClientPrincipal,
