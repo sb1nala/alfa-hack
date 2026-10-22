@@ -130,6 +130,14 @@ def test_contract_structure_and_examples_per_operation(path, method, operation):
         in {
             "/api/applications/{application_id}/submit",
             "/api/applications/{application_id}/cancel",
+            "/api/applications/{application_id}/accept-offer",
+            "/api/applications/{application_id}/additional-info",
+            "/api/applications/{application_id}/sign",
+            "/api/applications/{application_id}/documents",
+            "/api/applications/{application_id}/documents/{document_id}/download",
+            "/api/underwriter/applications",
+            "/api/underwriter/applications/{application_id}",
+            "/api/underwriter/applications/{application_id}/decision",
         }
     )
     assert ("501" in operation["responses"]) == (not implemented)
