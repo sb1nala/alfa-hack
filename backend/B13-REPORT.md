@@ -1,7 +1,8 @@
 # B13: CI и техническая готовность
 
 22.10.2026. **Заблокировано**: #76 (сборка исходного frontend) и SSE в рабочем UI
-(#6). Ветка `feat/backend-ci` от свежего `main` `4b0d556`; PR будет указан после создания.
+(#6). Ветка `feat/backend-ci` от свежего `main` `4b0d556`;
+[draft PR #84](https://github.com/sb1nala/alfa-hack/pull/84), слияние не выполнялось.
 #82 фактически слит; B10 не принят. Исторические результаты B10 сохранены со своим commit.
 
 ## Что реализовано
@@ -38,12 +39,26 @@ upload-artifact v6 `b7c566a`, setup-uv v7 `94527f2`.
   исчерпал send-timeout 0,3 с на независимый DB commit + намеренную задержку.
   Только для этого теста бюджет увеличен до 1,5 с: он проверяет access recheck,
   а timeout проверяется отдельными тестами. Продуктовые deadlines не изменены.
-  Полный повтор с 7 новыми CI-тестами выполняется; результат будет внесён.
+  Полный повтор с 7 новыми CI-тестами: **556 passed, 1 warning, 167,44 с**,
+  без skips/failures/errors (подтверждено JUnit gate), включая риски и миграции.
+  Предупреждение Starlette/TestClient/httpx существовало до B13.
 - Локальный строгий product runner: FAIL до frontend на HTTPS inspection CA
   (`UnknownIssuer` в uv внутри Docker). Это ограничение облачного build-окружения,
   не #76 и не успешная приёмка. Обёртка сохранила ненулевой код и выполнила очистку.
-- GitHub Actions: результат будет проверен после создания PR; локальная валидация
-  workflow не выдаётся за успешный Actions-прогон.
+- Локальная отдельная сборка исходного frontend с адаптацией **только доверия CA**
+  (BuildKit secret + NODE_EXTRA_CA_CERTS в pnpm install) дошла до **FAIL #76**:
+  `Generated types are not up-to-date!`. Исходные типы и api:check не менялись.
+  Это диагностика ограничения среды, не чистый успешный запуск.
+- Реальный [Actions run 39835941309](https://github.com/sb1nala/alfa-hack/actions/runs/39835941309)
+  на `bf785d4`: **Clean Docker product — FAIL #76**, `pnpm api:check` /
+  `Generated types are not up-to-date!`. Browser tools (Playwright + Chromium),
+  адресная очистка, аудит логов и upload безопасного артефакта — PASS.
+  API/persistence/browser после ошибки сборки не запускались.
+  **Backend checks — PASS**: Ruff, format, OpenAPI, полный pytest, JUnit без
+  skips и очистка тестового контейнера. Это фактический Actions, а не YAML-валидация.
+  После усиления проверки browser response и маскирования демонстрационных
+  паролей в текстовом pytest-отчёте выполнены целевые safety tests; новый push
+  автоматически проверит итоговый commit. Ручные повторы дорогих jobs не запускались.
 
 ## Остаток для приёмки
 

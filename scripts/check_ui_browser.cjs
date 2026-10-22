@@ -10,13 +10,19 @@ module.exports = async function checkUI(browser, cfg) {
   try {
     const page = await context.newPage();
     let streams = 0;
+    let openStreams = 0;
     let reads = 0;
     let documents = 0;
     page.on("request", (request) => {
       const url = new URL(request.url());
       if (request.resourceType() === "document") documents++;
-      if (url.pathname.endsWith("/events")) streams++;
+      if (url.pathname.endsWith("/events") && request.resourceType() === "eventsource") streams++;
       if (request.method() === "GET" && /^\/api\/applications\/[^/]+$/.test(url.pathname)) reads++;
+    });
+    page.on("response", (response) => {
+      if (new URL(response.url()).pathname.endsWith("/events") &&
+          response.request().resourceType() === "eventsource" && response.ok() &&
+          (response.headers()["content-type"] || "").startsWith("text/event-stream")) openStreams++;
     });
     await page.goto(cfg.origin, { waitUntil: "networkidle" });
     // MUI adds the required-field asterisk to these accessible labels.
@@ -42,8 +48,8 @@ module.exports = async function checkUI(browser, cfg) {
     console.log("PASS working SPA: login, picker, INN, submit, decision, accept, sign, ISSUED without reload");
     console.log(`UI transport observed: ${streams} EventSource requests, ${reads} card GETs; ` +
       (streams ? "SSE requests observed; resilience acceptance remains separate" : "polling; frontend SSE acceptance remains BLOCKED"));
-    if (process.env.REQUIRE_UI_SSE === "1" && streams === 0)
-      throw Error("Working React UI did not open /events; frontend SSE acceptance is BLOCKED (#6)");
+    if (process.env.REQUIRE_UI_SSE === "1" && (streams === 0 || openStreams === 0))
+      throw Error("Working React UI did not establish EventSource /events; frontend SSE acceptance is BLOCKED (#6)");
   } finally {
     await context.close();
   }

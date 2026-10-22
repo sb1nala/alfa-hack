@@ -52,6 +52,7 @@ def main():
     args = parser.parse_args()
     if args.safe_copy:
         secrets = [v for k, v in os.environ.items() if re.search("PASSWORD|SECRET|TOKEN", k)]
+        secrets += ["demo-2026", "analyst-2026"]
         args.safe_copy.parent.mkdir(parents=True, exist_ok=True)
         args.safe_copy.write_text(
             "".join(safe_line(line, secrets) for line in args.report.read_text().splitlines(True))

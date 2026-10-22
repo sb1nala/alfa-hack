@@ -78,7 +78,7 @@ B05 явно импортирует 10 аккаунтов, 9 компаний и
 | B10 | Заблокировано | Строгий оркестратор, API, EventSource, UI и сохранность; [отчёт](B10-REPORT.md) | [#76](https://github.com/sb1nala/alfa-hack/issues/76), EventSource в frontend | [PR #82 слит](https://github.com/sb1nala/alfa-hack/pull/82); #8 закрыт ранее, часть #9 |
 | B11 | Готово | Предложения, документы, дополнительные данные; подписание и симуляция выдачи из B12 | B08; форматы рисков | [PR #66](https://github.com/sb1nala/alfa-hack/pull/66) |
 | B12 | Готово | Очередь, банковская карточка и ручные решения (подписание и выдача — в B11) | B08, B11 | [PR #67](https://github.com/sb1nala/alfa-hack/pull/67), слит в ветку B11 |
-| B13 | Заблокировано | PR/push/manual CI, полный PostgreSQL pytest, строгий Docker/nginx; [отчёт B13](B13-REPORT.md) | #76; SSE в UI; реальный Actions-прогон | [#77](https://github.com/sb1nala/alfa-hack/issues/77), #9; материалы для продукта/QA |
+| B13 | Заблокировано | PR/push/manual CI, полный PostgreSQL pytest, строгий Docker/nginx; [отчёт B13](B13-REPORT.md) | #76; SSE в UI; реальный Actions-прогон | [Draft PR #84](https://github.com/sb1nala/alfa-hack/pull/84); [#77](https://github.com/sb1nala/alfa-hack/issues/77), #9 |
 
 ### B03. Модели БД и Alembic — готово
 
@@ -466,7 +466,7 @@ risk_class, requested_dscr/offer_dscr, data_gaps, стоп-факторы, revie
 
 ### B13. Техническая готовность к сдаче — Заблокировано
 
-- **Статус:** CI подготовлен в `feat/backend-ci`; [B13-REPORT.md](B13-REPORT.md) содержит ссылку на PR и реальные результаты. #76 и SSE в рабочем UI не позволяют принять B10/B13.
+- **Статус:** CI подготовлен в [draft PR #84](https://github.com/sb1nala/alfa-hack/pull/84); [B13-REPORT.md](B13-REPORT.md) содержит ссылку на PR и реальные результаты. #76 и SSE в рабочем UI не позволяют принять B10/B13.
 - **Результат:** независимый backend job и строгий product job без обхода #76, актуальный OpenAPI, команды и ограничения для документации продукта. Проверки добавляются в каждом PR, а не откладываются до B13.
 - **Вход:** [Issue #77](https://github.com/sb1nala/alfa-hack/issues/77), существующая
   QA-ветка `qa/e2e-stand`, команды B10. CI не реализуется повторно внутри B10.

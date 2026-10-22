@@ -15,7 +15,9 @@ def ci_tools(monkeypatch):
     return importlib.import_module("ci_reports"), importlib.import_module("ci_product")
 
 
-def test_diagnostics_filter_credentials_and_preserve_useful_failure(ci_tools, tmp_path):
+def test_diagnostics_filter_credentials_and_preserve_useful_failure(
+    ci_tools, tmp_path, monkeypatch
+):
     reports, product = ci_tools
     secret = "random-stand-value-23456789"
     (tmp_path / "stand.json").write_text(json.dumps({"env": {"POSTGRES_PASSWORD": secret}}))
@@ -41,6 +43,18 @@ def test_diagnostics_filter_credentials_and_preserve_useful_failure(ci_tools, tm
     assert output.getvalue().count("omitted") == 6
     assert "Generated types are not up-to-date!" in output.getvalue()
     assert reports.safe_line("PASS nginx HTTP 200\n") == "PASS nginx HTTP 200\n"
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    raw = tmp_path / "raw.log"
+    raw.write_text(payload)
+    safe = artifacts / "report.txt"
+    monkeypatch.setenv("POSTGRES_PASSWORD", secret)
+    monkeypatch.setattr(sys, "argv", ["ci_reports.py", str(raw), "--safe-copy", str(safe)])
+    reports.main()
+    reports.audit_reports(artifacts)
+    safe.write_text("session=opaque\n")
+    with pytest.raises(SystemExit, match="upload denied"):
+        reports.audit_reports(artifacts)
 
 
 @pytest.mark.parametrize(

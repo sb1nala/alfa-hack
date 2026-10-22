@@ -120,7 +120,7 @@ Frontend Dockerfile такого секрета пока не поддержив
   точный порядок истории, down/up с томами, повтор migrate/seed, отказ/возврат БД,
   native Chromium EventSource и отдельный smoke рабочего React UI.
 
-В CI `REQUIRE_UI_SSE=1`: рабочий UI должен сам открыть `/events`; polling даёт
+В CI `REQUIRE_UI_SSE=1`: рабочий UI должен сам установить EventSource `/events` с успешным ответом `text/event-stream`; polling даёт
 ошибку даже после успешного тестового EventSource. Наличие запроса подтверждает
 подключение UI, но полная приёмка TS-10 требует ещё проверки именованных событий,
 onopen/refetch, revision/id, восстановления истории и CLOSED/502 в интерфейсе.
