@@ -69,7 +69,7 @@ B05 явно импортирует 10 аккаунтов, 9 компаний и
 | B06 | Готово | Переходы, аудит, submit/cancel и очередь | B05; актуальная диаграмма отмены | [PR #55](https://github.com/sb1nala/alfa-hack/pull/55), слит; [#4](https://github.com/sb1nala/alfa-hack/issues/4), часть [#9](https://github.com/sb1nala/alfa-hack/issues/9) |
 | B07 | Готово | Worker, проверки и восстановление заданий | B06; моки рисков | [PR #57](https://github.com/sb1nala/alfa-hack/pull/57); часть [#5](https://github.com/sb1nala/alfa-hack/issues/5) |
 | B08 | Готово | Настоящий decide(), пять исходов, атомарное сохранение, fencing и диагностика | B07/#58; модуль рисков | [PR #64](https://github.com/sb1nala/alfa-hack/pull/64), слит; отчёт [#65 слит](https://github.com/sb1nala/alfa-hack/pull/65); продолжение #5 |
-| B09 | На ревью | История и настоящий SSE | B04, B06–B08; nginx фронтенда | [#6](https://github.com/sb1nala/alfa-hack/issues/6) |
+| B09 | На ревью | История и настоящий SSE | B04, B06–B08; nginx фронтенда | [PR #69](https://github.com/sb1nala/alfa-hack/pull/69); часть [#6](https://github.com/sb1nala/alfa-hack/issues/6), UI отдельно |
 | B10 | Запланировано | Сквозной Docker-сценарий | B01–B09; frontend и mocks | #8; часть #9 |
 | B11 | Готово | Предложения, документы, дополнительные данные; подписание и симуляция выдачи из B12 | B08; форматы рисков | [PR #66](https://github.com/sb1nala/alfa-hack/pull/66) |
 | B12 | Готово | Очередь, банковская карточка и ручные решения (подписание и выдача — в B11) | B08, B11 | [PR #67](https://github.com/sb1nala/alfa-hack/pull/67), слит в ветку B11 |
@@ -391,7 +391,7 @@ risk_class, requested_dscr/offer_dscr, data_gaps, стоп-факторы, revie
 - **B09 на ревью:** история API и SSE; следующий этап B10. B11/#66 и B12/#67
   уже слиты в aa83e9c, их бизнес-реализации в B09 не изменяются.
 
-### B09. История и SSE — На ревью
+### B09. История и SSE — На ревью ([PR #69](https://github.com/sb1nala/alfa-hack/pull/69))
 
 - **Результат:** история и поток `/api/applications/{id}/events` из сохранённых событий. Публичная проекция исключает внутренние факторы и сырые ответы моков.
 - **Файлы:** `backend/app/api/events.py`, `app/event_history.py`, `app/event_stream.py`, PostgreSQL/TCP-тесты и настройки. Существующие frontend/nginx не изменены.
