@@ -1,7 +1,7 @@
 meta {
   name: Выход
   type: http
-  seq: 10
+  seq: 11
 }
 
 post {
@@ -11,6 +11,7 @@ post {
 }
 
 headers {
+  Origin: {{origin}}
   X-CSRF-Token: {{csrf}}
 }
 

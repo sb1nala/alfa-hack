@@ -1,0 +1,30 @@
+meta {
+  name: Запрос с чужого сайта
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/applications
+  body: json
+  auth: none
+}
+
+headers {
+  Origin: https://evil.example
+  X-CSRF-Token: {{csrf}}
+}
+
+body:json {
+  {}
+}
+
+tests {
+  test("HTTP 403", function () {
+    expect([403]).to.include(res.status);
+  });
+}
+
+docs {
+  Origin не совпадает с AUTH_ALLOWED_ORIGIN — мутация отклоняется даже с валидными cookie и CSRF.
+}

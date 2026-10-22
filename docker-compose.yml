@@ -36,6 +36,11 @@ services:
       MOCKS_BASE_URL: http://mocks:8000
       EGRUL_TIMEOUT: ${EGRUL_TIMEOUT:-2}
       DOCUMENTS_DIR: /data/documents
+      SSE_POLL_INTERVAL: ${SSE_POLL_INTERVAL:-1}
+      SSE_ACCESS_INTERVAL: ${SSE_ACCESS_INTERVAL:-5}
+      SSE_BATCH_SIZE: ${SSE_BATCH_SIZE:-50}
+      SSE_DB_TIMEOUT: ${SSE_DB_TIMEOUT:-5}
+      SSE_SEND_TIMEOUT: ${SSE_SEND_TIMEOUT:-10}
     volumes:
       - documents_data:/data/documents
       - ./seed/accounts.json:/seed/accounts.json:ro
@@ -44,6 +49,7 @@ services:
       - ./docs/product/ui-texts.ru.json:/seed/product-texts.json:ro
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    stop_grace_period: 20s
     depends_on:
       migrate:
         condition: service_completed_successfully

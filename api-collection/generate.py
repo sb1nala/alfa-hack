@@ -28,8 +28,9 @@ def bru(name, seq, method, url, *, body=None, multipart=None, headers=None, pre=
     body_kind = "json" if body is not None else "multipartForm" if multipart else "none"
     parts.append(f"{method} {{\n  url: {url}\n  body: {body_kind}\n  auth: none\n}}\n")
     hdrs = dict(headers or {})
-    if method in ("post", "patch", "put", "delete") and "X-CSRF-Token" not in hdrs:
-        hdrs["X-CSRF-Token"] = "{{csrf}}"
+    if method in ("post", "patch", "put", "delete"):
+        hdrs.setdefault("Origin", "{{origin}}")
+        hdrs.setdefault("X-CSRF-Token", "{{csrf}}")
     hdrs = {k: v for k, v in hdrs.items() if v is not None}
     if hdrs:
         parts.append("headers {\n" + "".join(f"  {k}: {v}\n" for k, v in hdrs.items()) + "}\n")
@@ -190,15 +191,18 @@ def negative_folder():
             "{{baseUrl}}/api/companies/lookup?inn=123", expect=422)),
         ("07 Изменение без CSRF-токена", bru("Изменение без CSRF-токена", 7, "post",
             "{{baseUrl}}/api/applications", body="{}", headers={"X-CSRF-Token": None}, expect=403)),
-        ("08 Черновик для проверки версий", bru("Черновик для проверки версий", 8, "post",
+        ("08 Запрос с чужого сайта", bru("Запрос с чужого сайта", 8, "post",
+            "{{baseUrl}}/api/applications", body="{}", headers={"Origin": "https://evil.example"}, expect=403,
+            docs="Origin не совпадает с AUTH_ALLOWED_ORIGIN — мутация отклоняется даже с валидными cookie и CSRF.")),
+        ("09 Черновик для проверки версий", bru("Черновик для проверки версий", 9, "post",
             "{{baseUrl}}/api/applications", body="{}",
             post='bru.setVar("negApplicationId", res.body.id);', expect=201)),
-        ("09 Устаревшая версия заявки", bru("Устаревшая версия заявки", 9, "patch",
+        ("10 Устаревшая версия заявки", bru("Устаревшая версия заявки", 10, "patch",
             "{{baseUrl}}/api/applications/{{negApplicationId}}",
             body='{\n  "expected_revision": 999,\n  "term_months": 12\n}', expect=409,
             docs="Защита от одновременного редактирования: ожидаем 409 и текст errors.conflict.")),
-        ("10 Выход", bru("Выход", 10, "post", "{{baseUrl}}/api/auth/logout", expect=204)),
-        ("11 Без входа", bru("Без входа", 11, "get", "{{baseUrl}}/api/applications", expect=401)),
+        ("11 Выход", bru("Выход", 11, "post", "{{baseUrl}}/api/auth/logout", expect=204)),
+        ("12 Без входа", bru("Без входа", 12, "get", "{{baseUrl}}/api/applications", expect=401)),
     ]
     return reqs
 
@@ -215,7 +219,8 @@ def environments():
         outcome = c["expected_outcome"]
         outcome = outcome if isinstance(outcome, str) else outcome.get("outcome", json.dumps(outcome, ensure_ascii=False))
         values = {
-            "baseUrl": "http://localhost:8000",
+            "baseUrl": "http://localhost:8080",
+            "origin": "http://localhost:8080",
             "clientLogin": c["client_login"],
             "clientPassword": passwords[c["client_login"]],
             "analystLogin": analyst["login"],
@@ -253,7 +258,7 @@ def main():
     for login, values in environments().items():
         body = "vars {\n" + "".join(f"  {k}: {v}\n" for k, v in values.items()) + "}\n"
         write(OUT / "environments" / f"{login}.bru", body)
-        prism = body.replace("http://localhost:8000", "http://127.0.0.1:4010")
+        prism = body.replace("http://localhost:8080", "http://127.0.0.1:4010")
         if login == "demo-approve":
             write(OUT / "environments" / "prism-mock.bru", prism)
 

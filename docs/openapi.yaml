@@ -4361,13 +4361,11 @@ paths:
       - underwriter
   /api/applications/{application_id}/events:
     get:
-      description: 'Будущий SSE для владельца client или underwriter, стандартный EventSource одного
+      description: 'SSE для владельца client или underwriter, стандартный EventSource одного
 
         origin: `new EventSource(''/api/applications/'' + id + ''/events'')`. Cookie JWT
 
         передаётся браузером автоматически; заголовок Authorization и CSRF для GET не нужны.
-
-        Сейчас возвращается **501 application/json**, поток не открывается.
 
 
         Успешный ответ: `text/event-stream`, UTF-8, Cache-Control: no-cache,
@@ -4393,7 +4391,9 @@ paths:
 
         UUID — непрозрачный курсор, сортировать его лексикографически нельзя. Чужой курсор
 
-        — 404, удалённый из периода хранения — 410; срок хранения согласовать при реализации.
+        и неизвестный курсор — 404. Очистки/TTL событий нет; 410 зарезервирован для
+
+        подтверждённого истечения после согласования политики хранения.
 
         Без курсора — новые события с момента подключения. На onopen клиент перечитывает
 
@@ -4405,11 +4405,7 @@ paths:
 
         История доступна отдельно через GET /history. События содержат только публичную
 
-        инвалидацию состояния; подробное решение нужно получать из подходящей роли карточки.
-
-
-
-        Бизнес-заглушка: 501 после проверок доступа.'
+        инвалидацию состояния; подробное решение нужно получать из подходящей роли карточки.'
       operationId: events_api_applications__application_id__events_get
       parameters:
       - in: path
@@ -4535,7 +4531,7 @@ paths:
                     id: 70000000-0000-4000-8000-000000000001
               x-event-schema:
                 $ref: '#/components/schemas/SSEEvent'
-          description: Будущий успешный ответ (после проверок доступа пока 501)
+          description: Успешный ответ
           headers:
             Cache-Control:
               schema:
@@ -4560,6 +4556,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректный запрос
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -4579,6 +4579,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Требуется вход
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -4598,6 +4602,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Недостаточно прав или неверный CSRF-токен
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -4617,6 +4625,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Ресурс не найден или недоступен этому владельцу
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -4636,6 +4648,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Курсор событий устарел; перечитайте карточку и историю
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -4658,6 +4674,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректные параметры запроса
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -4677,6 +4697,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Слишком много запросов
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -4696,25 +4720,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Внутренняя ошибка
           headers:
-            X-Request-ID:
+            Cache-Control:
               schema:
-                format: uuid
+                const: no-store
                 type: string
-        '501':
-          content:
-            application/json:
-              examples:
-                error:
-                  summary: 'Синтетический пример: error'
-                  value:
-                    code: NOT_IMPLEMENTED
-                    field_errors: []
-                    message: Контракт определён; бизнес-операция пока не реализована
-                    request_id: 80000000-0000-4000-8000-000000000001
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Контракт определён; бизнес-операция пока не реализована
-          headers:
             X-Request-ID:
               schema:
                 format: uuid
@@ -4729,12 +4738,10 @@ paths:
       - underwriter
   /api/applications/{application_id}/history:
     get:
-      description: 'Публичная история по возрастанию ревизии и внутренней последовательности событий.
-        cursor — исключительная нижняя граница; next_cursor — для следующей страницы. Внутренние факторы,
-        авторы банковских решений и сырые ответы моков исключены.
-
-
-        Бизнес-заглушка: 501 после проверок доступа.'
+      description: Публичная история по внутренней sequence заявки, включая события одной revision. cursor
+        — исключительная нижняя граница; next_cursor — для следующей страницы. Неизвестный/чужой UUID
+        — 404; 410 зарезервирован для подтверждённого истечения после согласования хранения, очистки/TTL
+        сейчас нет. Внутренние факторы, авторы банковских решений и сырые ответы моков исключены.
       operationId: history_api_applications__application_id__history_get
       parameters:
       - in: path
@@ -4784,7 +4791,12 @@ paths:
                     next_cursor: null
               schema:
                 $ref: '#/components/schemas/EventList'
-          description: Будущий успешный ответ (после проверок доступа пока 501)
+          description: Успешный ответ
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
         '400':
           content:
             application/json:
@@ -4800,6 +4812,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректный запрос
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -4819,6 +4835,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Требуется вход
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -4838,6 +4858,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Недостаточно прав или неверный CSRF-токен
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -4857,6 +4881,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Ресурс не найден или недоступен этому владельцу
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -4876,6 +4904,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Курсор событий устарел; перечитайте карточку и историю
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -4898,6 +4930,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Некорректные параметры запроса
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -4917,6 +4953,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Слишком много запросов
           headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
             X-Request-ID:
               schema:
                 format: uuid
@@ -4936,25 +4976,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Внутренняя ошибка
           headers:
-            X-Request-ID:
+            Cache-Control:
               schema:
-                format: uuid
+                const: no-store
                 type: string
-        '501':
-          content:
-            application/json:
-              examples:
-                error:
-                  summary: 'Синтетический пример: error'
-                  value:
-                    code: NOT_IMPLEMENTED
-                    field_errors: []
-                    message: Контракт определён; бизнес-операция пока не реализована
-                    request_id: 80000000-0000-4000-8000-000000000001
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Контракт определён; бизнес-операция пока не реализована
-          headers:
             X-Request-ID:
               schema:
                 format: uuid

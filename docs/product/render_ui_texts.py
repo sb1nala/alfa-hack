@@ -103,6 +103,13 @@ def main():
         table(["code", "Что нужно", "Зачем"],
               [(f"`{c}`", v["title"], v["explanation"]) for c, v in items(t["requiredDocuments"])]),
         "",
+        "## Причины ручной проверки (только для аналитика)",
+        "",
+        "> " + t["manualReviewReasons"]["_note"],
+        "",
+        table(["code", "Заголовок", "Пояснение"],
+              [(f"`{c}`", v["title"], v["explanation"]) for c, v in items(t["manualReviewReasons"])]),
+        "",
     ]
     simple = [
         ("Общее", "common"), ("Вход", "login"), ("Подбор продукта", "productPicker"), ("Анкета", "form"),
