@@ -22,13 +22,11 @@ def max_principal(payment: float, annual_rate_percent: float, months: int) -> fl
 def monthly_service(
     product_code: str, amount: float, annual_rate_percent: float, months: int
 ) -> float:
-    """Monthly debt service of the new loan.
+    """Monthly debt service of the new loan: an annuity over the term.
 
-    Overdraft: interest on the fully drawn limit. Credit line: treated as a fully drawn
-    annuity loan (conservative).
+    Credit line and overdraft are treated as fully drawn and repaid within the term
+    (conservative): interest-only would overstate affordability.
     """
-    if product_code == "overdraft":
-        return amount * annual_rate_percent / 100 / 12
     return annuity(amount, annual_rate_percent, months)
 
 
@@ -44,8 +42,6 @@ def max_affordable(
     annual_rate_percent: float,
     months: int,
 ) -> float:
-    """Largest new loan keeping DSCR >= DSCR_MIN."""
+    """Largest new loan keeping DSCR >= DSCR_MIN (same annuity rule for every product)."""
     free_payment = annual_cash_flow / 12 / DSCR_MIN - existing_monthly
-    if product_code == "overdraft":
-        return max(0.0, free_payment) / (annual_rate_percent / 100 / 12)
     return max_principal(free_payment, annual_rate_percent, months)

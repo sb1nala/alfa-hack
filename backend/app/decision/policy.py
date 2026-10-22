@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-POLICY_VERSION = "2026-10-21.draft1"
+POLICY_VERSION = "2026-10-22.draft2"
 
 
 @dataclass(frozen=True)
@@ -95,3 +95,4 @@ REVIEW_GRAY_ZONE = "gray_zone"
 REVIEW_COLLATERAL = "collateral_review"
 REVIEW_DOCUMENTS = "documents_review"
 REVIEW_REVENUE_MISMATCH = "revenue_mismatch_review"
+REVIEW_INCOMPLETE = "incomplete_checks"
