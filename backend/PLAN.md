@@ -7,7 +7,7 @@
 > PR #58 и код B08 из коммита 333cc6c
 > фактически слиты; B08 включён владельцем в [PR #64](https://github.com/sb1nala/alfa-hack/pull/64).
 > PR #64 и [#65](https://github.com/sb1nala/alfa-hack/pull/65) слиты; B08 готов.
-> B09/#69 слит. Новый B10 PR — draft, автор слияние не выполняет.
+> B09/#69 слит. [B10 PR #82](https://github.com/sb1nala/alfa-hack/pull/82) — draft, автор слияние не выполняет.
 > В main работает сквозной путь до решения и клиентской карточки.
 
 ## Что уже доступно команде
@@ -73,7 +73,7 @@ B05 явно импортирует 10 аккаунтов, 9 компаний и
 | B07 | Готово | Worker, проверки и восстановление заданий | B06; моки рисков | [PR #57](https://github.com/sb1nala/alfa-hack/pull/57); часть [#5](https://github.com/sb1nala/alfa-hack/issues/5) |
 | B08 | Готово | Настоящий decide(), пять исходов, атомарное сохранение, fencing и диагностика | B07/#58; модуль рисков | [PR #64](https://github.com/sb1nala/alfa-hack/pull/64), слит; отчёт [#65 слит](https://github.com/sb1nala/alfa-hack/pull/65); продолжение #5 |
 | B09 | Готово (сервер) | История и настоящий SSE, #69 слит | B04, B06–B08; nginx фронтенда | [PR #69](https://github.com/sb1nala/alfa-hack/pull/69); [#6](https://github.com/sb1nala/alfa-hack/issues/6) открыт, UI отдельно |
-| B10 | Заблокировано | Строгий оркестратор, API, EventSource, UI и сохранность; [отчёт](B10-REPORT.md) | [#76](https://github.com/sb1nala/alfa-hack/issues/76), EventSource в frontend | Отдельный draft PR этой ветки; #8 закрыт ранее, часть #9 |
+| B10 | Заблокировано | Строгий оркестратор, API, EventSource, UI и сохранность; [отчёт](B10-REPORT.md) | [#76](https://github.com/sb1nala/alfa-hack/issues/76), EventSource в frontend | [Draft PR #82](https://github.com/sb1nala/alfa-hack/pull/82); #8 закрыт ранее, часть #9 |
 | B11 | Готово | Предложения, документы, дополнительные данные; подписание и симуляция выдачи из B12 | B08; форматы рисков | [PR #66](https://github.com/sb1nala/alfa-hack/pull/66) |
 | B12 | Готово | Очередь, банковская карточка и ручные решения (подписание и выдача — в B11) | B08, B11 | [PR #67](https://github.com/sb1nala/alfa-hack/pull/67), слит в ветку B11 |
 | B13 | Следующий этап | CI и итоговые проверки, технические артефакты | B01–B12; закрытие блокеров B10 | [#77](https://github.com/sb1nala/alfa-hack/issues/77), #9; материалы для продукта/QA |
