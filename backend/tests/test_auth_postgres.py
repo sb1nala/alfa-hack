@@ -499,6 +499,12 @@ def test_all_business_routes_check_access(client, account, resources, monkeypatc
             expected = 404  # The fixture row has no stored blob; B11 tests cover content.
         if path.startswith("/api/underwriter/") and method == "get":
             expected = 200
+        if path.endswith("/history"):
+            expected = 200
+        if path.endswith("/events"):
+            # The generic contract supplies an example cursor, not a saved event.
+            # Successful streaming is exercised over real HTTP in B09 tests.
+            expected = 404
         if role not in roles:
             expected = 403
         elif account == SECOND and "{application_id}" in path:

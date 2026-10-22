@@ -2,19 +2,18 @@ import json
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Header, Response
+from fastapi import APIRouter, Header, Request, Response
 
 from app.api import examples as ex
 from app.api.applications import ApplicationID
-from app.api.contract import endpoint, not_implemented
-from app.dependencies import accessible_application
+from app.api.contract import endpoint
+from app.event_stream import EventStreamResponse, prepare_stream, stream_events
 
 router = APIRouter(prefix="/api/applications", tags=["events"])
 SSE_DESCRIPTION = """
-Будущий SSE для владельца client или underwriter, стандартный EventSource одного
+SSE для владельца client или underwriter, стандартный EventSource одного
 origin: `new EventSource('/api/applications/' + id + '/events')`. Cookie JWT
 передаётся браузером автоматически; заголовок Authorization и CSRF для GET не нужны.
-Сейчас возвращается **501 application/json**, поток не открывается.
 
 Успешный ответ: `text/event-stream`, UTF-8, Cache-Control: no-cache,
 X-Accel-Buffering: no. Кадр содержит `id: <UUID application_event>`,
@@ -28,7 +27,8 @@ Heartbeat — комментарий `: heartbeat` и пустая строка 
 При переподключении EventSource сам передаёт Last-Event-ID. Сервер воспроизводит
 события строго после курсора в порядке записи; возможны повторы, дедупликация по id.
 UUID — непрозрачный курсор, сортировать его лексикографически нельзя. Чужой курсор
-— 404, удалённый из периода хранения — 410; срок хранения согласовать при реализации.
+и неизвестный курсор — 404. Очистки/TTL событий нет; 410 зарезервирован для
+подтверждённого истечения после согласования политики хранения.
 Без курсора — новые события с момента подключения. На onopen клиент перечитывает
 карточку (в том числе после reconnect), использует revision для защиты от устаревших
 обновлений. При ошибке соединения перечитывает карточку/историю; EventSource
@@ -68,8 +68,11 @@ for index, event_type in enumerate(
         + "\n\n"
     )
 stream_contract = endpoint(
-    None, {}, SSE_DESCRIPTION, role="both", extra_errors=(410,), access=accessible_application
+    None, {}, SSE_DESCRIPTION, role="both", extra_errors=(410,), implemented=True
 )
+# The ordinary guards depend on a request-scoped yield DB session. Authenticate
+# explicitly in prepare_stream so no dependency holds a connection through SSE.
+stream_contract["dependencies"] = []
 stream_contract["responses"][200].update(
     {
         "headers": {
@@ -91,8 +94,12 @@ stream_contract["responses"][200].update(
 @router.get("/{application_id}/events", response_class=Response, **stream_contract)
 async def events(
     application_id: ApplicationID,
+    request: Request,
     last_event_id: Annotated[
         UUID | None, Header(alias="Last-Event-ID", examples=[ex.EVENT_ID])
     ] = None,
 ) -> Response:
-    not_implemented()
+    start = await prepare_stream(request, application_id, last_event_id)
+    return EventStreamResponse(
+        stream_events(request, start), send_timeout=request.app.state.settings.sse_send_timeout
+    )

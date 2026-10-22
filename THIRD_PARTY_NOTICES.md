@@ -138,3 +138,12 @@ HTTPX перенесён также в runtime бэкенда для обращ�
 | --- | --- | --- | --- |
 | [Node.js](https://hub.docker.com/_/node) (`node:24.19.0-bookworm-slim`) | 24.19.0 | MIT | Только этап сборки образа фронтенда |
 | [nginx](https://hub.docker.com/r/nginxinc/nginx-unprivileged) (`nginxinc/nginx-unprivileged:1.27.5-alpine`) | 1.27.5 | BSD-2-Clause | Раздача SPA и прокси `/api` в runtime-образе |
+
+## История и SSE (B09)
+
+AnyIO 4.15.1 (MIT), уже зафиксированный транзитивно в `backend/uv.lock`, объявлен
+прямой зависимостью: защищённая от повторной отмены очистка коротких SQL-операций.
+Версии существующих пакетов не изменены.
+Для отдельного Docker/browser smoke используется Playwright 1.57.0 (Apache-2.0)
+с Chromium (BSD и лицензии включённых компонентов). Это внешние инструменты проверки;
+они не добавляются в backend/frontend runtime или lock-файлы приложения.

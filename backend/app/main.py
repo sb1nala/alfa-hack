@@ -68,7 +68,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if request.url.path.startswith("/api/") or request.url.path == "/api":
             response.headers["X-Request-ID"] = str(request.state.request_id)
         if request.url.path.startswith("/api/"):
-            response.headers["Cache-Control"] = "no-store"
+            response.headers.setdefault("Cache-Control", "no-store")
         return response
 
     app.add_exception_handler(RequestValidationError, validation_error)
