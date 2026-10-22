@@ -82,7 +82,7 @@ def step(name: str, fn):
         fn()
         results.append((name, True, f"{time.monotonic() - start:.1f} с"))
     except Exception as e:  # noqa: BLE001
-        results.append((name, False, f"{type(e).__name__}: {str(e).splitlines()[0][:300]}"))
+        results.append((name, False, f"{type(e).__name__}: {' | '.join(str(e).splitlines()[:8])[:900]}"))
     print(("✅" if results[-1][1] else "❌"), name, results[-1][2], flush=True)
 
 
@@ -129,12 +129,27 @@ def scenario_bki(browser):
 
 
 def scenario_manual(browser):
+    pages = {}
+    try:
+        _scenario_manual(browser, pages)
+    except Exception:
+        for name, page in pages.items():
+            try:
+                shot(page, f"manual-FAIL-{name}")
+            except Exception:  # noqa: BLE001
+                pass
+        raise
+
+
+def _scenario_manual(browser, pages):
     client = new_page(browser, video=True)
+    pages["client"] = client
     login(client, "demo-manual", PASSWORD)
     apply(client, COMPANIES["demo-manual"], "")
     wait_title(client, "MANUAL_REVIEW")
     shot(client, "manual-01-client-waiting")
     bank = new_page(browser, video=True)
+    pages["bank"] = bank
     login(bank, "analyst", "analyst-2026")
     shot(bank, "manual-02-bank-queue")
     bank.get_by_role("row").filter(has_text=COMPANIES["demo-manual"]["company"]["name"]).first.click()
