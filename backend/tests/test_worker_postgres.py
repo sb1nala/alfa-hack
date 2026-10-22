@@ -194,6 +194,40 @@ async def test_two_workers_and_skip_locked(rig):
 
 
 @pytest.mark.anyio
+async def test_claim_leaves_other_ready_jobs_available(rig, monkeypatch):
+    second_application = submit(rig.actors, complete(rig.actors)).json()
+    acquired, release = asyncio.Event(), asyncio.Event()
+    async with rig.worker() as first, rig.worker() as second:
+        original_transaction = first.transaction
+
+        @asynccontextmanager
+        async def hold_before_commit():
+            async with original_transaction() as db:
+                yield db
+                # Keep the first claim's real PostgreSQL locks until worker 2 runs.
+                acquired.set()
+                await release.wait()
+
+        monkeypatch.setattr(first, "transaction", hold_before_commit)
+        first_task = asyncio.create_task(first.claim())
+        try:
+            await asyncio.wait_for(acquired.wait(), 2)
+            second_claim = await asyncio.wait_for(second.claim(), 2)
+        finally:
+            release.set()
+            first_claim = await asyncio.wait_for(first_task, 2)
+
+        assert first_claim is not None and second_claim is not None
+        assert first_claim.job_id != second_claim.job_id
+        assert {first_claim.application_id, second_claim.application_id} == {
+            UUID(rig.application["id"]),
+            UUID(second_application["id"]),
+        }
+        assert first_claim.attempt == second_claim.attempt == 1
+        assert await second.claim() is None
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize("failure", ["timeout", "503", "429", "network", "deadline"])
 async def test_retry_then_success(rig, failure):
     calls = []

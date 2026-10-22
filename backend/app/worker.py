@@ -83,6 +83,7 @@ class Worker:
                     ),
                 )
                 .order_by(PipelineJob.available_at, PipelineJob.id)
+                .limit(1)
                 .with_for_update(skip_locked=True)
             )
             if job is None:
