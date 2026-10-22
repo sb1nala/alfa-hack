@@ -29,15 +29,6 @@ jobs:
           docker version --format 'Docker {{.Server.Version}}'
           docker compose version
 
-      - name: Обход бага #76 — перегенерировать типы фронтенда (только в QA-ветке)
-        if: ${{ vars.QA_SKIP_76_WORKAROUND != 'true' }}
-        run: |
-          cd frontend
-          corepack enable
-          pnpm install --frozen-lockfile
-          pnpm api:generate
-          git diff --stat -- src/api/schema.d.ts
-
       - name: Быстрый старт — шаг 2 (README)
         run: |
           start=$(date +%s)
