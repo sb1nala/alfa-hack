@@ -40,7 +40,7 @@ upload-artifact v6 `b7c566a`, setup-uv v7 `94527f2`.
   Существующий тест `test_recheck_access_after_slow_heartbeat_before_event`
   исчерпал send-timeout 0,3 с на независимый DB commit + намеренную задержку.
   Только для этого теста бюджет увеличен до 1,5 с: он проверяет access recheck,
-  а timeout проверяется отдельными тестами. Продуктовые deadlines не изменены.
+  а timeout проверяется отдельным тестом. Продуктовые deadlines не изменены.
   Полный повтор с 7 новыми CI-тестами: **556 passed, 1 warning, 167,44 с**,
   без skips/failures/errors (подтверждено JUnit gate), включая риски и миграции.
   Предупреждение Starlette/TestClient/httpx существовало до B13.
@@ -62,9 +62,34 @@ upload-artifact v6 `b7c566a`, setup-uv v7 `94527f2`.
   паролей в текстовом pytest-отчёте выполнены целевые safety tests; новый push
   автоматически проверит итоговый commit. Ручные повторы дорогих jobs не запускались.
 
-Повтор после merge #83: новый строгий Actions product job запущен без обходов;
-результат будет проверен перед финальным отчётом. Предыдущий красный #76 выше
-относится только к `bf785d4`, а не к обновлённому main.
+## Итог после merge #83
+
+Проверен commit **`32a57441d815695b94ac081b077426d321d0fc3a`** на базе main
+`e8d72ca`: [Actions run 39836676297](https://github.com/sb1nala/alfa-hack/actions/runs/39836676297).
+Следующий commit обновляет только техническую документацию с этими результатами.
+
+| Проверка в GitHub Actions | Результат |
+| --- | --- |
+| Backend checks | **PASS**, 556 passed / 1 прежнее warning, 187,61 с, без skips |
+| Исходные образы и штатный up/migrate/seed | **PASS**, включая frontend после #83; обходов и ручной подготовки БД нет |
+| run_e2e.py через nginx | **PASS 10/10**, все 9 компаний, причины, негативные HTTP, аналитик, клиентские действия и аудит |
+| PDF bytes / NEEDS_INFO / issuance / точный аудит | **PASS** |
+| Down/up с томами, сессией, карточкой, историей и файлом; повтор migrate/seed | **PASS** |
+| Отказ/возврат PostgreSQL, ready=503/live=200 и сохранность | **PASS** |
+| Серверный Chromium EventSource через nginx | **PASS**, heartbeat 15002 мс, native Last-Event-ID, onopen/refetch, restart/recreate/DNS, live и replay |
+| Рабочий SPA через формы без reload | **PASS**, login → подбор → ИНН → submit → решение → accept → sign → ISSUED |
+| SSE именно в рабочем React UI | **FAIL #6/TS-10**: 0 EventSource, 8 card GET; используется polling |
+| Очистка, аудит и upload безопасной диагностики | **PASS** |
+
+Итог `Clean Docker product` — **FAIL именно на отсутствии SSE в рабочем UI**.
+#76 после #83 больше не является причиной красного CI. Ранние сообщения nginx
+при намеренном restart/recreate ожидаемы; серверный тест подтвердил восстановление.
+Тестовый EventSource не засчитывается за React. Браузерные resilience-критерии
+самого UI ещё требуют frontend-реализации и отдельной приёмки.
+
+Локальная сборка frontend на e8d72ca с адаптацией только CA также **PASS**:
+api:check → TypeScript → Vite, готовый образ затем удалён. Это диагностика среды;
+подтверждение чистого запуска получено именно в Actions выше.
 
 ## Остаток для приёмки
 
@@ -72,6 +97,6 @@ Frontend: API-типы уже обновлены и слиты в #83 (сам #7
 Остаётся подключить EventSource в React, проверить именованные события, onopen/refetch, revision/id,
 восстановление истории и CLOSED/502. После слияния повторить строгий product job.
 Тимлид: проверить фактические Actions и включить `Backend checks`, `Clean Docker product`
-как required checks защиты main после зелёного прогона. Настройки защиты не менялись,
+как required checks защиты main после зелёного прогона. Настройки защиты не менялись.
 Автор B13 Issues не закрывал; #76 закрыт через frontend #83. #6/#9/#77 остаются
 открыты, сообщения участникам не отправлялись.

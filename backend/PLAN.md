@@ -3,7 +3,7 @@
 > Обновлено: 22 октября 2026. Проверяемый main —
 > [`e8d72ca`](https://github.com/sb1nala/alfa-hack/commit/e8d72ca).
 > **B01–B09, B11 и B12 — Готово; B10 — Заблокировано (SSE в UI, TS-10).**
-> **B13 — Заблокировано: SSE в рабочем UI; CI проверяется на main после #83.**
+> **B13 — Заблокировано: SSE в рабочем UI; backend CI зелёный, product CI красный на polling рабочего UI.**
 > Основание: [#77](https://github.com/sb1nala/alfa-hack/issues/77).
 > PR #58 и код B08 из коммита 333cc6c
 > фактически слиты; B08 включён владельцем в [PR #64](https://github.com/sb1nala/alfa-hack/pull/64).
@@ -59,7 +59,7 @@ B05 явно импортирует 10 аккаунтов, 9 компаний и
 Они **не равны номерам GitHub Issues**: например, B03 — реализация БД,
 а [Issue #3](https://github.com/sb1nala/alfa-hack/issues/3) — описание модели данных.
 Связь с Issue не означает, что весь Issue закрыт. #8 закрыт после #61;
-#76 закрыт после слияния frontend PR #83; строгий product job повторяется. #6 и #9 открыты.
+#76 закрыт после слияния frontend PR #83; строгий product job дошёл до UI и отклонил polling. #6 и #9 открыты.
 
 Все пути ниже относительно корня репозитория. Будущие пути — ориентиры для реализации;
 переиспользовать текущие модули и схемы, не создавать параллельный API.
@@ -78,7 +78,7 @@ B05 явно импортирует 10 аккаунтов, 9 компаний и
 | B10 | Заблокировано | Строгий оркестратор, API, EventSource, UI и сохранность; [отчёт](B10-REPORT.md) | EventSource в frontend (#6); #76 исправлен в #83 | [PR #82 слит](https://github.com/sb1nala/alfa-hack/pull/82); #8 закрыт ранее, часть #9 |
 | B11 | Готово | Предложения, документы, дополнительные данные; подписание и симуляция выдачи из B12 | B08; форматы рисков | [PR #66](https://github.com/sb1nala/alfa-hack/pull/66) |
 | B12 | Готово | Очередь, банковская карточка и ручные решения (подписание и выдача — в B11) | B08, B11 | [PR #67](https://github.com/sb1nala/alfa-hack/pull/67), слит в ветку B11 |
-| B13 | Заблокировано | PR/push/manual CI, полный PostgreSQL pytest, строгий Docker/nginx; [отчёт B13](B13-REPORT.md) | SSE в UI; строгий Actions-прогон после #83 | [Draft PR #84](https://github.com/sb1nala/alfa-hack/pull/84); [#77](https://github.com/sb1nala/alfa-hack/issues/77), #9 |
+| B13 | Заблокировано | PR/push/manual CI, полный PostgreSQL pytest, строгий Docker/nginx; [отчёт B13](B13-REPORT.md) | #6/TS-10: UI не устанавливает SSE, 0 EventSource / 8 card GET | [Draft PR #84](https://github.com/sb1nala/alfa-hack/pull/84); [#77](https://github.com/sb1nala/alfa-hack/issues/77), #9 |
 
 ### B03. Модели БД и Alembic — готово
 
@@ -445,7 +445,7 @@ risk_class, requested_dscr/offer_dscr, data_gaps, стоп-факторы, revie
   down/up с томами, отказ/возврат БД и сценарий рабочего UI без перезагрузки.
   Диагностическая регенерация временных типов разрешается только явным
   `--allow-stale-types`; её успех не подтверждает штатный запуск.
-- **Владелец frontend:** регенерировать и закоммитить типы (#76), подключить
+- **Владелец frontend:** типы обновлены и слиты в #83, #76 закрыт. Остаётся подключить
   именованные SSE-события, onopen/refetch и восстановление после CLOSED/502.
   Рабочий UI пока использует polling. #6 не закрывается.
 - **Далее B13:** CI из предложения #77: чистая сборка, PostgreSQL pytest,
@@ -466,7 +466,7 @@ risk_class, requested_dscr/offer_dscr, data_gaps, стоп-факторы, revie
 
 ### B13. Техническая готовность к сдаче — Заблокировано
 
-- **Статус:** CI подготовлен в [draft PR #84](https://github.com/sb1nala/alfa-hack/pull/84); [B13-REPORT.md](B13-REPORT.md) содержит ссылку на PR и реальные результаты. #76 исправлен в #83 и включён merge в ветку B13; SSE в рабочем UI и строгий прогон после #83 ещё нужны для приёмки B10/B13.
+- **Статус:** CI подготовлен в [draft PR #84](https://github.com/sb1nala/alfa-hack/pull/84); [B13-REPORT.md](B13-REPORT.md) содержит ссылку на PR и реальные результаты. #76 исправлен в #83 и включён merge в ветку B13; Actions на `32a5744`: backend PASS (556 tests, без skips), чистая сборка/API/persistence/серверный SSE PASS; product FAIL на SSE рабочего UI (0 EventSource, 8 card GET). Для приёмки B10/B13 нужны frontend SSE и повтор затронутых критериев.
 - **Результат:** независимый backend job и строгий product job без обхода #76, актуальный OpenAPI, команды и ограничения для документации продукта. Проверки добавляются в каждом PR, а не откладываются до B13.
 - **Вход:** [Issue #77](https://github.com/sb1nala/alfa-hack/issues/77), существующая
   QA-ветка `qa/e2e-stand`, команды B10. CI не реализуется повторно внутри B10.
