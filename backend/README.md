@@ -13,7 +13,7 @@ B09 реализует публичную историю и SSE из сохра�
 
 ## B10: штатный запуск и воспроизводимая проверка
 
-**На main `4d77082` чистый запуск заблокирован [#76](https://github.com/sb1nala/alfa-hack/issues/76):**
+**На main `4b0d556` (PR #82 уже слит) чистый запуск заблокирован [#76](https://github.com/sb1nala/alfa-hack/issues/76):**
 `frontend` падает на `api:check`, поскольку закоммиченные типы отстают от OpenAPI.
 Фронтендеру нужно выполнить `pnpm api:generate`, проверить `pnpm typecheck && pnpm build`
 и закоммитить результат. Отдельная зависимость — подключить EventSource вместо polling.
@@ -99,6 +99,101 @@ Frontend Dockerfile такого секрета пока не поддержив
 описана отдельно в отчёте и не считается исправлением #76. Режим файлов checkout
 должен соответствовать обычному Git checkout (0644 для JSON и nginx.conf), чтобы их
 читали UID 10001 и nginx. Проверки не требуют `chmod` чужих исходников или подмены seed.
+
+## B13: автоматические проверки PR
+
+[Project CI](../.github/workflows/ci.yml) запускается на каждом `pull_request` в
+`main`, `push` в `main` и вручную через `workflow_dispatch`. Path-фильтров нет:
+контракт, seed, зависимости, Dockerfile и frontend всегда проверяются вместе.
+Два независимых стабильных имени для branch protection:
+
+- **Backend checks**: Python 3.12, uv 0.12.23, `uv sync --locked`, Ruff всего
+  backend/scripts (включая decision), format вне `app/decision`, экспорт OpenAPI
+  `--check`, полный `pytest --run-postgres`, затем контроль JUnit без пропусков.
+  Известное замечание форматирования `app/decision` остаётся у владельца рисков;
+  тесты `tests/decision` включены. Количество тестов не фиксируется.
+- **Clean Docker product**: исходный `docker compose up --build --wait` с новым
+  project name, свободными портами, секретами и томами. Штатный `migrate` применяет
+  схему и seed. Далее `check_product_docker.py` вызывает неизменённый
+  `api-collection/run_e2e.py` через nginx: все 9 компаний, причины, клиентские
+  действия, решение аналитика, негативные HTTP и аудит. Дополнительно — байты PDF,
+  точный порядок истории, down/up с томами, повтор migrate/seed, отказ/возврат БД,
+  native Chromium EventSource и отдельный smoke рабочего React UI.
+
+В CI `REQUIRE_UI_SSE=1`: рабочий UI должен сам открыть `/events`; polling даёт
+ошибку даже после успешного тестового EventSource. Наличие запроса подтверждает
+подключение UI, но полная приёмка TS-10 требует ещё проверки именованных событий,
+onopen/refetch, revision/id, восстановления истории и CLOSED/502 в интерфейсе.
+Сборка при #76 обязана падать: `api:check` не отключается, временная регенерация
+типов и `--allow-stale-types` не используются. B10/B13 пока заблокированы.
+
+Повтор backend локально из `backend/` (Python 3.12, uv 0.12.23):
+
+```bash
+uv sync --locked
+uv run --locked ruff check . ../scripts
+uv run --locked ruff format --check . ../scripts --extend-exclude app/decision
+uv run --locked python -m app.export_openapi --check
+uv run --locked --env-file /path/to/isolated-test.env pytest -q --run-postgres \
+  --junitxml=/tmp/backend-pytest.xml
+python ../scripts/ci_reports.py /tmp/backend-pytest.xml --check-pytest
+```
+
+`isolated-test.env` должен явно задавать `POSTGRES_HOST`, `POSTGRES_PORT`,
+`POSTGRES_DB=postgres` (административная БД), `POSTGRES_USER`, случайный
+`POSTGRES_PASSWORD`, `AUTH_JWT_SECRET`, `AUTH_ALLOWED_ORIGIN=http://localhost:8080`,
+`AUTH_COOKIE_SECURE=false`. Используйте отдельную PostgreSQL 16, без рабочих данных.
+Роли нужны LOGIN и CREATEDB (официальный CI-контейнер создаёт временного superuser).
+Фикстура сама создаёт/удаляет `b03_test_<uuid>`; миграции и откаты выполняются там.
+Уже покрыты создание схемы, повторный upgrade, metadata/check, сохранение старых
+данных, промежуточные downgrade и `downgrade base` с восстановлением. Новых
+дублирующих миграционных тестов B13 не добавляет.
+
+Повтор product job из корня (Docker/Compose, Node из `frontend/.node-version`):
+
+```bash
+npm install --prefix /tmp/b13-browser-tools --no-audit --no-fund --save-exact playwright@1.57.0
+/tmp/b13-browser-tools/node_modules/.bin/playwright install --with-deps chromium
+PLAYWRIGHT_MODULE=/tmp/b13-browser-tools/node_modules/playwright REQUIRE_UI_SSE=1 \
+  python3 scripts/ci_product.py run \
+  --state-dir /tmp/b13-private-state --report-dir /tmp/b13-reports
+# Резервная очистка после прерывания — только записанного проекта:
+python3 scripts/ci_product.py cleanup \
+  --state-dir /tmp/b13-private-state --report-dir /tmp/b13-reports
+```
+
+Playwright использует свой соответствующий Chromium; `CHROMIUM_EXECUTABLE` можно
+явно задать для установленного браузера. Инструменты живут вне runtime backend.
+Продуктовый runner использует `.env.example` и генерирует значения в окружении:
+локальный `.env` и production-секреты не нужны. Не загружайте `state-dir`: это
+временные credentials (файл 0600, каталог 0700), удаляемые после успешной очистки.
+Обёртка сохраняет ненулевой exit code и фильтрует stdout/stderr, включая Compose
+логи, до вывода/записи. В артефакты идут только безопасные текстовые отчёты,
+без `.env`, cookie/storage state, полного DB dump или конфигурации Compose.
+
+При сбое во вкладке Actions доступны `backend-diagnostics` (фильтрованный JUnit
+как текст) и `product-diagnostics` (ход сборки, traceback, последние 150 строк
+Compose и состояние сервисов, если Docker уже их создал); хранение 7 дней.
+Основной результат каждого шага — в job logs. Синтаксис отдельно проверяется
+`actionlint` 1.7.12; валидный YAML и локальный запуск не означают успешные Actions.
+Реальные результаты B13 и ссылки — [B13-REPORT.md](B13-REPORT.md).
+
+Тимлиду после успешного полного прогона следует включить **Backend checks** и
+**Clean Docker product** как required checks защиты `main`, проверить запуск
+Actions для PR и разрешение pinned Actions, сохранить review перед merge.
+Необходимы только `contents: read`, production secrets и `pull_request_target`
+не требуются. Эти настройки B13 сам не меняет. `workflow_dispatch` через UI будет
+доступен после появления workflow в default branch; PR-trigger работает до merge.
+Таймауты jobs — 20/35 минут, устаревшие прогоны одной ветки отменяются; очистка
+работает в runner и отдельном `always()` шаге. При жёстком уничтожении hosted runner
+ресурсы исчезают вместе с VM, глобальный Docker prune не применяется.
+
+**Граница доказательств:** только строгий product job подтверждает чистый запуск
+и пользовательский HTTP через nginx. `check_docker.py` — глубокая диагностика
+worker/lease/сбоев; `check_sse_docker.py` — серверный браузерный smoke с адаптациями
+окружения. Их успех, особенно с диагностическим обходом типов, не заменяет
+чистую сборку или приёмку SSE рабочего UI. Подробное фактическое покрытие
+`run_e2e.py` и его ограничения сохранены в [B10-REPORT.md](B10-REPORT.md).
 
 ## Настройки авторизации
 
@@ -407,7 +502,7 @@ Submit, переход, аудит, снимок входов, задание и
 ```bash
 uv run --locked pytest -q
 uv run --locked ruff check . ../scripts
-uv run --locked ruff format --check . ../scripts
+uv run --locked ruff format --check . ../scripts --extend-exclude app/decision
 uv run --locked python -m app.export_openapi --check
 ```
 

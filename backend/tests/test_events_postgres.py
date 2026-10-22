@@ -656,6 +656,11 @@ async def test_preopen_db_failure_has_json_error(live, monkeypatch, failure):
 
 async def test_recheck_access_after_slow_heartbeat_before_event(live, monkeypatch):
     app, client, settings, *_ = live
+    # This test checks access revalidation after a slow send, not send timeout.
+    # A new DB connection + revocation commit can exceed the fixture's 0.3s
+    # budget on a busy runner, closing the stream before the heartbeat arrives.
+    # Keep the deadline bounded but leave room for that independent transaction.
+    settings.sse_send_timeout = 1.5
     await login(client)
     application_id = await new_application(app)
     ids = await write_events(app, application_id, ("application_updated",) * 3)

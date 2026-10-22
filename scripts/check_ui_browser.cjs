@@ -42,6 +42,8 @@ module.exports = async function checkUI(browser, cfg) {
     console.log("PASS working SPA: login, picker, INN, submit, decision, accept, sign, ISSUED without reload");
     console.log(`UI transport observed: ${streams} EventSource requests, ${reads} card GETs; ` +
       (streams ? "SSE requests observed; resilience acceptance remains separate" : "polling; frontend SSE acceptance remains BLOCKED"));
+    if (process.env.REQUIRE_UI_SSE === "1" && streams === 0)
+      throw Error("Working React UI did not open /events; frontend SSE acceptance is BLOCKED (#6)");
   } finally {
     await context.close();
   }

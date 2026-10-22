@@ -1,13 +1,15 @@
 # Бэкенд: план реализации и текущий статус
 
 > Обновлено: 22 октября 2026. Проверяемый main —
-> [`4d77082`](https://github.com/sb1nala/alfa-hack/commit/4d77082).
+> [`4b0d556`](https://github.com/sb1nala/alfa-hack/commit/4b0d556).
 > **B01–B09, B11 и B12 — Готово; B10 — Заблокировано (#76 и SSE в UI).**
-> Следующий этап — B13 с учётом [#77](https://github.com/sb1nala/alfa-hack/issues/77).
+> **B13 — Заблокировано: #76 и SSE в рабочем UI; независимый CI подготовлен.**
+> Основание: [#77](https://github.com/sb1nala/alfa-hack/issues/77).
 > PR #58 и код B08 из коммита 333cc6c
 > фактически слиты; B08 включён владельцем в [PR #64](https://github.com/sb1nala/alfa-hack/pull/64).
 > PR #64 и [#65](https://github.com/sb1nala/alfa-hack/pull/65) слиты; B08 готов.
-> B09/#69 слит. [B10 PR #82](https://github.com/sb1nala/alfa-hack/pull/82) — draft, автор слияние не выполняет.
+> B09/#69 и [B10 PR #82](https://github.com/sb1nala/alfa-hack/pull/82) фактически слиты.
+> Слияние проверочных скриптов #82 не означает приёмку B10.
 > В main работает сквозной путь до решения и клиентской карточки.
 
 ## Что уже доступно команде
@@ -73,10 +75,10 @@ B05 явно импортирует 10 аккаунтов, 9 компаний и
 | B07 | Готово | Worker, проверки и восстановление заданий | B06; моки рисков | [PR #57](https://github.com/sb1nala/alfa-hack/pull/57); часть [#5](https://github.com/sb1nala/alfa-hack/issues/5) |
 | B08 | Готово | Настоящий decide(), пять исходов, атомарное сохранение, fencing и диагностика | B07/#58; модуль рисков | [PR #64](https://github.com/sb1nala/alfa-hack/pull/64), слит; отчёт [#65 слит](https://github.com/sb1nala/alfa-hack/pull/65); продолжение #5 |
 | B09 | Готово (сервер) | История и настоящий SSE, #69 слит | B04, B06–B08; nginx фронтенда | [PR #69](https://github.com/sb1nala/alfa-hack/pull/69); [#6](https://github.com/sb1nala/alfa-hack/issues/6) открыт, UI отдельно |
-| B10 | Заблокировано | Строгий оркестратор, API, EventSource, UI и сохранность; [отчёт](B10-REPORT.md) | [#76](https://github.com/sb1nala/alfa-hack/issues/76), EventSource в frontend | [Draft PR #82](https://github.com/sb1nala/alfa-hack/pull/82); #8 закрыт ранее, часть #9 |
+| B10 | Заблокировано | Строгий оркестратор, API, EventSource, UI и сохранность; [отчёт](B10-REPORT.md) | [#76](https://github.com/sb1nala/alfa-hack/issues/76), EventSource в frontend | [PR #82 слит](https://github.com/sb1nala/alfa-hack/pull/82); #8 закрыт ранее, часть #9 |
 | B11 | Готово | Предложения, документы, дополнительные данные; подписание и симуляция выдачи из B12 | B08; форматы рисков | [PR #66](https://github.com/sb1nala/alfa-hack/pull/66) |
 | B12 | Готово | Очередь, банковская карточка и ручные решения (подписание и выдача — в B11) | B08, B11 | [PR #67](https://github.com/sb1nala/alfa-hack/pull/67), слит в ветку B11 |
-| B13 | Следующий этап | CI и итоговые проверки, технические артефакты | B01–B12; закрытие блокеров B10 | [#77](https://github.com/sb1nala/alfa-hack/issues/77), #9; материалы для продукта/QA |
+| B13 | Заблокировано | PR/push/manual CI, полный PostgreSQL pytest, строгий Docker/nginx; [отчёт B13](B13-REPORT.md) | #76; SSE в UI; реальный Actions-прогон | [#77](https://github.com/sb1nala/alfa-hack/issues/77), #9; материалы для продукта/QA |
 
 ### B03. Модели БД и Alembic — готово
 
@@ -430,7 +432,7 @@ risk_class, requested_dscr/offer_dscr, data_gaps, стоп-факторы, revie
   события, onopen/refetch, revision/id и восстановление CLOSED после 502 по README.
   Следующий этап бэкенда — B10; Issue #6 не закрывается автоматически.
 
-### B10. Сквозной запуск — заблокирован, подготовлен draft PR
+### B10. Сквозной запуск — заблокирован; PR #82 слит
 
 - **Результат:** db, backend, worker, mocks и frontend поднимаются одной командой; readiness БД, однократные миграции и идемпотентный seed предшествуют работе сервисов.
 - **Файлы:** `docker-compose.yml`, проверочный скрипт на основе `scripts/check_docker.py`, интеграционные тесты и технические сведения для инструкции запуска.
@@ -462,9 +464,10 @@ risk_class, requested_dscr/offer_dscr, data_gaps, стоп-факторы, revie
 - **Файлы:** `backend/app/api/underwriting.py`, сервисы ручных решений и оформления, тесты.
 - **Готовность:** клиенту запрещены банковские операции; сохраняются автор, объяснения и аудит; повтор команды не дублирует выдачу. Банковскую часть можно реализовать 22.10 до документов B11; оформление — после принятия предложения.
 
-### B13. Техническая готовность к сдаче
+### B13. Техническая готовность к сдаче — Заблокировано
 
-- **Результат:** CI, полный интеграционный прогон, актуальный OpenAPI, команды и ограничения для документации продукта. Проверки добавляются в каждом PR, а не откладываются до B13.
+- **Статус:** CI подготовлен в `feat/backend-ci`; [B13-REPORT.md](B13-REPORT.md) содержит ссылку на PR и реальные результаты. #76 и SSE в рабочем UI не позволяют принять B10/B13.
+- **Результат:** независимый backend job и строгий product job без обхода #76, актуальный OpenAPI, команды и ограничения для документации продукта. Проверки добавляются в каждом PR, а не откладываются до B13.
 - **Вход:** [Issue #77](https://github.com/sb1nala/alfa-hack/issues/77), существующая
   QA-ветка `qa/e2e-stand`, команды B10. CI не реализуется повторно внутри B10.
 - **Файлы:** `.github/workflows/`, `backend/tests/`, скрипты проверок; технические данные для README, коллекции запросов и THIRD_PARTY_NOTICES передаются продукту.
