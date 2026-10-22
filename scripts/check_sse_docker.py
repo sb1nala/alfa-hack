@@ -3,11 +3,13 @@
 Requires Node, Playwright and Chromium; see backend/README.md. Never changes frontend.
 """
 
+import argparse
 import json
 import os
 import secrets
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
@@ -18,6 +20,25 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--allow-stale-types",
+        action="store_true",
+        help="Diagnostic only: regenerate types in a temporary frontend; NOT a clean build",
+    )
+    parser.add_argument(
+        "--product-checks",
+        action="store_true",
+        help="Also run the existing product API runner and B10 persistence checks",
+    )
+    parser.add_argument(
+        "--ui-only",
+        action="store_true",
+        help="Only the working SPA smoke; do not repeat native EventSource checks",
+    )
+    args = parser.parse_args()
+    if args.ui_only and args.product_checks:
+        parser.error("--ui-only cannot be combined with --product-checks")
     env = os.environ.copy()
     ports = set()
     while len(ports) < 4:
@@ -39,6 +60,10 @@ def main():
     )
     env["AUTH_ALLOWED_ORIGIN"] = f"http://127.0.0.1:{frontend}"
     project = "alfa-b09-browser-" + secrets.token_hex(5)
+    env["COMPOSE_PROJECT_NAME"] = project
+    env["NO_PROXY"] = env["no_proxy"] = ",".join(
+        filter(None, [env.get("NO_PROXY", ""), env.get("no_proxy", ""), "localhost", "127.0.0.1"])
+    )
     with tempfile.TemporaryDirectory(prefix="alfa-b09-browser-") as temporary:
         staging = Path(temporary)
         staging.chmod(0o755)
@@ -59,13 +84,13 @@ def main():
             front,
             ignore=shutil.ignore_patterns("node_modules", "dist", ".env*"),
         )
-        # Removing implemented 501 responses changes generated API types. Only this
-        # disposable build regenerates them; the frontend owner updates the source.
-        dockerfile = (
-            (front / "Dockerfile")
-            .read_text()
-            .replace("RUN pnpm build", "RUN pnpm api:generate && pnpm build")
-        )
+        dockerfile = (front / "Dockerfile").read_text()
+        if args.allow_stale_types:
+            print(
+                "DIAGNOSTIC ONLY: regenerating temporary frontend types; #76 is NOT cleared",
+                flush=True,
+            )
+            dockerfile = dockerfile.replace("RUN pnpm build", "RUN pnpm api:generate && pnpm build")
         install = "RUN NODE_USE_ENV_PROXY=1 pnpm install --frozen-lockfile"
         override = {
             "services": {
@@ -158,6 +183,7 @@ def main():
                                 "BACKEND_",
                                 "MOCKS_",
                                 "WORKER_",
+                                "COMPOSE_PROJECT_NAME",
                             )
                         )
                     },
@@ -172,11 +198,34 @@ def main():
         try:
             run("build", "backend", "mocks", "frontend")
             run("up", "-d", "--wait", "--wait-timeout", "90")
+            if args.product_checks:
+                from check_product_docker import check_persistence
+
+                env.update(
+                    E2E_BASE_URL=env["AUTH_ALLOWED_ORIGIN"],
+                    E2E_ORIGIN=env["AUTH_ALLOWED_ORIGIN"],
+                    E2E_MOCKS_URL=f"http://127.0.0.1:{mocks}",
+                )
+                subprocess.run(
+                    [sys.executable, str(ROOT / "api-collection/run_e2e.py")],
+                    env=env,
+                    check=True,
+                    timeout=600,
+                )
+                check_persistence(["docker", *compose], env, env["AUTH_ALLOWED_ORIGIN"])
             subprocess.run(
-                ["node", str(ROOT / "scripts/check_sse_browser.cjs"), str(browser)],
+                [
+                    "node",
+                    str(
+                        ROOT
+                        / "scripts"
+                        / ("check_ui_browser.cjs" if args.ui_only else "check_sse_browser.cjs")
+                    ),
+                    str(browser),
+                ],
                 env=env,
                 check=True,
-                timeout=100,
+                timeout=180,
             )
         except Exception:
             run("logs", "--no-color", "--tail", "60", "frontend", "backend", "migrate")
