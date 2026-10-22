@@ -11,6 +11,7 @@ export function errorMessage(error: unknown): string {
     if (error.status === 404) return t.errors.notFound;
     if (error.status === 409) return t.errors.conflict;
     if (error.status === 422 || error.status === 400) return t.errors.validation;
+    if (error.status === 501) return 'Эта функция ещё не реализована на сервере.';
   }
   return t.errors.generic;
 }
