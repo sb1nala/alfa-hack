@@ -7,6 +7,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link as RouterLink, Navigate, useParams } from 'react-router-dom';
 import { api, ApiProtocolError } from '../../api/index.ts';
 import { keys, productById, useApplication, useProducts, type ClientApplication } from '../../api/hooks.ts';
+import { useApplicationLive } from '../../api/useApplicationLive.ts';
 import { DecisionBlock } from '../../components/client/DecisionBlock.tsx';
 import { ApplicationTimeline } from '../../components/ApplicationTimeline.tsx';
 import { ErrorAlert } from '../../components/ErrorAlert.tsx';
@@ -16,14 +17,16 @@ import { productTexts, statusTexts, t } from '../../lib/texts.ts';
 
 const SLOW_CHECKING_MS = 10_000;
 
-/** Экран 5 (screen-map.md): таймлайн, карточка статуса, решение. Обновляется опросом до B09 (SSE). */
+/** Экран 5 (screen-map.md): таймлайн, карточка статуса, решение и SSE. */
 export function ApplicationPage() {
   const { id = '' } = useParams();
-  const application = useApplication(id);
+  const application = useApplication(id, true);
+  const live = useApplicationLive(id, application.data);
   const products = useProducts();
 
   if (application.isPending) return <CircularProgress aria-label={t.common.loading} />;
   if (application.error) return <ErrorAlert error={application.error} />;
+  if (live.error) return <ErrorAlert error={live.error} />;
   const app = application.data;
   if (app.status === 'DRAFT') return <Navigate to={`/client/applications/${id}/edit`} replace />;
 
@@ -32,6 +35,7 @@ export function ApplicationPage() {
 
   return (
     <Stack spacing={3}>
+      {live.lost && <Alert severity="warning" role="status">{t.errors.liveUpdatesLost}</Alert>}
       <Box>
         <Button component={RouterLink} to="/client" size="small" sx={{ mb: 1 }}>← {t.applications.title}</Button>
         <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}>
