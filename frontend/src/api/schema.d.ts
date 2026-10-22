@@ -165,10 +165,9 @@ export interface paths {
         };
         /**
          * Events
-         * @description Будущий SSE для владельца client или underwriter, стандартный EventSource одного
+         * @description SSE для владельца client или underwriter, стандартный EventSource одного
          *     origin: `new EventSource('/api/applications/' + id + '/events')`. Cookie JWT
          *     передаётся браузером автоматически; заголовок Authorization и CSRF для GET не нужны.
-         *     Сейчас возвращается **501 application/json**, поток не открывается.
          *
          *     Успешный ответ: `text/event-stream`, UTF-8, Cache-Control: no-cache,
          *     X-Accel-Buffering: no. Кадр содержит `id: <UUID application_event>`,
@@ -182,16 +181,14 @@ export interface paths {
          *     При переподключении EventSource сам передаёт Last-Event-ID. Сервер воспроизводит
          *     события строго после курсора в порядке записи; возможны повторы, дедупликация по id.
          *     UUID — непрозрачный курсор, сортировать его лексикографически нельзя. Чужой курсор
-         *     — 404, удалённый из периода хранения — 410; срок хранения согласовать при реализации.
+         *     и неизвестный курсор — 404. Очистки/TTL событий нет; 410 зарезервирован для
+         *     подтверждённого истечения после согласования политики хранения.
          *     Без курсора — новые события с момента подключения. На onopen клиент перечитывает
          *     карточку (в том числе после reconnect), использует revision для защиты от устаревших
          *     обновлений. При ошибке соединения перечитывает карточку/историю; EventSource
          *     не предоставляет коду HTTP-статус и не позволяет задавать произвольные заголовки.
          *     История доступна отдельно через GET /history. События содержат только публичную
          *     инвалидацию состояния; подробное решение нужно получать из подходящей роли карточки.
-         *
-         *
-         *     Бизнес-заглушка: 501 после проверок доступа.
          */
         get: operations["events_api_applications__application_id__events_get"];
         put?: never;
@@ -211,9 +208,7 @@ export interface paths {
         };
         /**
          * History
-         * @description Публичная история по возрастанию ревизии и внутренней последовательности событий. cursor — исключительная нижняя граница; next_cursor — для следующей страницы. Внутренние факторы, авторы банковских решений и сырые ответы моков исключены.
-         *
-         *     Бизнес-заглушка: 501 после проверок доступа.
+         * @description Публичная история по внутренней sequence заявки, включая события одной revision. cursor — исключительная нижняя граница; next_cursor — для следующей страницы. Неизвестный/чужой UUID — 404; 410 зарезервирован для подтверждённого истечения после согласования хранения, очистки/TTL сейчас нет. Внутренние факторы, авторы банковских решений и сырые ответы моков исключены.
          */
         get: operations["history_api_applications__application_id__history_get"];
         put?: never;
@@ -2468,7 +2463,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Будущий успешный ответ (после проверок доступа пока 501) */
+            /** @description Успешный ответ */
             200: {
                 headers: {
                     "Cache-Control"?: "no-cache";
@@ -2482,6 +2477,7 @@ export interface operations {
             /** @description Некорректный запрос */
             400: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -2492,6 +2488,7 @@ export interface operations {
             /** @description Требуется вход */
             401: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -2502,6 +2499,7 @@ export interface operations {
             /** @description Недостаточно прав или неверный CSRF-токен */
             403: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -2512,6 +2510,7 @@ export interface operations {
             /** @description Ресурс не найден или недоступен этому владельцу */
             404: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -2522,6 +2521,7 @@ export interface operations {
             /** @description Курсор событий устарел; перечитайте карточку и историю */
             410: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -2532,6 +2532,7 @@ export interface operations {
             /** @description Некорректные параметры запроса */
             422: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -2542,6 +2543,7 @@ export interface operations {
             /** @description Слишком много запросов */
             429: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -2552,16 +2554,7 @@ export interface operations {
             /** @description Внутренняя ошибка */
             500: {
                 headers: {
-                    "X-Request-ID"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Контракт определён; бизнес-операция пока не реализована */
-            501: {
-                headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -2585,9 +2578,10 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Будущий успешный ответ (после проверок доступа пока 501) */
+            /** @description Успешный ответ */
             200: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     [name: string]: unknown;
                 };
                 content: {
@@ -2597,6 +2591,7 @@ export interface operations {
             /** @description Некорректный запрос */
             400: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -2607,6 +2602,7 @@ export interface operations {
             /** @description Требуется вход */
             401: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -2617,6 +2613,7 @@ export interface operations {
             /** @description Недостаточно прав или неверный CSRF-токен */
             403: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -2627,6 +2624,7 @@ export interface operations {
             /** @description Ресурс не найден или недоступен этому владельцу */
             404: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -2637,6 +2635,7 @@ export interface operations {
             /** @description Курсор событий устарел; перечитайте карточку и историю */
             410: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -2647,6 +2646,7 @@ export interface operations {
             /** @description Некорректные параметры запроса */
             422: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -2657,6 +2657,7 @@ export interface operations {
             /** @description Слишком много запросов */
             429: {
                 headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -2667,16 +2668,7 @@ export interface operations {
             /** @description Внутренняя ошибка */
             500: {
                 headers: {
-                    "X-Request-ID"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Контракт определён; бизнес-операция пока не реализована */
-            501: {
-                headers: {
+                    "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
