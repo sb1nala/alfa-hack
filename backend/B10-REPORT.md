@@ -1,5 +1,32 @@
 # B10: воспроизводимость Docker и интеграция
 
+## Текущий статус после итоговой технической приёмки, 23.10.2026 (UTC)
+
+**Реализация завершена и слита:** B10 [#82](https://github.com/sb1nala/alfa-hack/pull/82),
+B13 [#84](https://github.com/sb1nala/alfa-hack/pull/84), frontend SSE [#85](https://github.com/sb1nala/alfa-hack/pull/85),
+API review_reason [#89](https://github.com/sb1nala/alfa-hack/pull/89) по уже закрытому #88.
+Проверенный свежий main: `1c93ac7c32e644667e99959109b90a04cf6403aa`.
+[Project CI #15](https://github.com/sb1nala/alfa-hack/actions/runs/39926680775), push этого main:
+
+- [Backend checks — success](https://github.com/sb1nala/alfa-hack/actions/runs/39926680775/job/120324682397),
+  **576 passed**, без skips/failures/errors; Ruff/format/OpenAPI/миграции PASS.
+- [Clean Docker product — success](https://github.com/sb1nala/alfa-hack/actions/runs/39926680775/job/120324682864),
+  исходный Compose без обхода api:check, migrate/seed, API 10/10, PDF/аудит/тома,
+  возврат БД, серверный SSE (heartbeat 15002 мс/Last-Event-ID/replay),
+  React до ISSUED без reload, 1 EventSource и 11 GET карточки.
+- Отдельная адресная проверка на том же commit: реальная остановка мока и БД
+  во время обработки; прежние API/worker восстановились без requeue и дублей.
+
+**Backend технически готов; общая QA-приёмка не завершена.** Восстановление самого
+React UI при потере сети/CLOSED/502 остаётся frontend/QA, required checks — тимлиду.
+Детальная матрица доказательств, ограничения, DoD #9 и рекомендации #6/#9/#77/#88:
+[ACCEPTANCE-REPORT.md](ACCEPTANCE-REPORT.md). Настройки защиты не менялись.
+
+## История до слияния B13 — исходные результаты сохранены
+
+Все статусы «На ревью»/Draft и «слияние не выполнялось» ниже относятся к моменту
+соответствующего прогона. Они не являются текущим статусом слитых PR.
+
 Дата: 22.10.2026 (Москва). Статус: **На ревью** в
 [PR #84](https://github.com/sb1nala/alfa-hack/pull/84).
 [PR #82](https://github.com/sb1nala/alfa-hack/pull/82) фактически слит в main `4b0d556`.
