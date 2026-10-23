@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { t } from './texts.ts';
 import {
   buildDecisionRequest, counterReasonCodes, defaultExplanation, documentCodes, rejectionCodes,
-  riskClassFrom, scoreFromFactors, validateDraft, type DecisionDraft,
+  reviewRecommendation, riskClassFrom, scoreFromFactors, validateDraft, type DecisionDraft,
 } from './bankDecision.ts';
 
 const draft = (patch: Partial<DecisionDraft>): DecisionDraft => ({
@@ -87,4 +88,14 @@ test('score sums contributions; class is read from the analytical text', () => {
   assert.equal(scoreFromFactors([]), null);
   assert.equal(riskClassFrom('Класс D (65 баллов), DSCR запроса 1.06'), 'D');
   assert.equal(riskClassFrom('Стоп-факторы: tax_debt'), null);
+});
+
+test('manual review recommendation uses the product dictionary, else the analytical text', () => {
+  assert.deepEqual(reviewRecommendation('gray_zone', 'Класс D'), {
+    title: t.manualReviewReasons.gray_zone.title,
+    text: t.manualReviewReasons.gray_zone.explanation,
+  });
+  assert.deepEqual(reviewRecommendation('new_code', 'Класс D'), { title: null, text: 'Класс D' });
+  assert.deepEqual(reviewRecommendation(null, 'Класс D'), { title: null, text: 'Класс D' });
+  assert.deepEqual(reviewRecommendation('_note', 'Класс D'), { title: null, text: 'Класс D' });
 });

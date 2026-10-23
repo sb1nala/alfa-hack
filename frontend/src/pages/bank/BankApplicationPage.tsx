@@ -9,7 +9,7 @@ import { productById, useProducts } from '../../api/hooks.ts';
 import { DecisionForm } from '../../components/bank/DecisionForm.tsx';
 import { ErrorAlert } from '../../components/ErrorAlert.tsx';
 import { StatusChip } from '../../components/StatusChip.tsx';
-import { riskClassColor, riskClassFrom, scoreFromFactors } from '../../lib/bankDecision.ts';
+import { reviewRecommendation, riskClassColor, riskClassFrom, scoreFromFactors } from '../../lib/bankDecision.ts';
 import { formatDate, formatRub } from '../../lib/format.ts';
 import { productTexts, t } from '../../lib/texts.ts';
 
@@ -90,9 +90,11 @@ export function BankApplicationPage() {
               <Section title={t.bank.card.systemRecommendation}>
                 <Stack spacing={1}>
                   <StatusChip status={latest.public.outcome} bank />
-                  {/* review_reason is not exposed by BankDecision yet; keep the bank-only explanation. */}
-                  <Typography>{latest.public.outcome === 'MANUAL_REVIEW'
-                    ? latest.analytical_explanation : latest.public.explanation}</Typography>
+                  {latest.public.outcome === 'MANUAL_REVIEW' ? (
+                    <ReviewReason decision={latest} />
+                  ) : (
+                    <Typography>{latest.public.explanation}</Typography>
+                  )}
                 </Stack>
               </Section>
             )}
@@ -153,6 +155,17 @@ function Scoring({ decision }: { decision: BankDecision }) {
       </Table>
       <Typography variant="body2" color="text.secondary">{decision.analytical_explanation}</Typography>
     </Stack>
+  );
+}
+
+/** Почему заявка на ручной проверке: заголовок и пояснение из словаря продукта. */
+function ReviewReason({ decision }: { decision: BankDecision }) {
+  const { title, text } = reviewRecommendation(decision.review_reason, decision.analytical_explanation);
+  return (
+    <>
+      {title && <Typography sx={{ fontWeight: 600 }}>{title}</Typography>}
+      <Typography color={title ? 'text.secondary' : undefined}>{text}</Typography>
+    </>
   );
 }
 
