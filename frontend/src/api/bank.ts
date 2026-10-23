@@ -11,13 +11,21 @@ export const bankKeys = {
   card: (id: string) => ['underwriter', 'card', id] as const,
 };
 
-/** Очередь аналитика: по умолчанию MANUAL_REVIEW, «all» — все заявки (для демо). */
+type ApplicationStatus = components['schemas']['ApplicationStatus'];
+
+/** «Все заявки» для аналитика — всё, что клиент отправил; черновики банку не нужны. */
+export const SUBMITTED_STATUSES: ApplicationStatus[] = [
+  'SUBMITTED', 'CHECKING', 'SCORING', 'NEEDS_INFO', 'MANUAL_REVIEW', 'APPROVED', 'COUNTER_OFFER',
+  'REJECTED', 'OFFER_ACCEPTED', 'SIGNED', 'ISSUED', 'CANCELLED',
+];
+
+/** Очередь аналитика: по умолчанию MANUAL_REVIEW, «all» — все отправленные заявки. */
 export function useUnderwriterQueue(filter: 'MANUAL_REVIEW' | 'all') {
   return useQuery({
     queryKey: bankKeys.queue(filter),
     queryFn: async ({ signal }) => {
       const { data } = await api.http.GET('/api/underwriter/applications', {
-        params: { query: { limit: 100, ...(filter === 'all' ? {} : { status: filter }) } },
+        params: { query: { limit: 100, status: filter === 'all' ? SUBMITTED_STATUSES : ['MANUAL_REVIEW'] } },
         signal,
       });
       if (!data) throw new ApiProtocolError();

@@ -79,7 +79,7 @@ def wire_request(path, method, operation):
             continue
         if value is not None:
             target = "params" if param["in"] == "query" else "headers"
-            kwargs[target][param["name"]] = str(value)
+            kwargs[target][param["name"]] = value if isinstance(value, list) else str(value)
     content = operation.get("requestBody", {}).get("content", {})
     for media_type, media in content.items():
         values = media["examples"]

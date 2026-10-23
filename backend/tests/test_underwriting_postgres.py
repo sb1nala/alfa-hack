@@ -100,6 +100,15 @@ async def test_queue_card_and_role_boundaries(review):
     assert drafts["limit"] == 1 and len(drafts["items"]) <= 1
     assert all(i["status"] == "DRAFT" for i in drafts["items"])
     assert actors.bank.get(QUEUE, params={"offset": 10_000}).json()["items"] == []
+    # Repeated status: any of the listed statuses, one ordered page and one total.
+    several = {"status": ["MANUAL_REVIEW", "DRAFT"], "limit": 100}
+    mixed = actors.bank.get(QUEUE, params=several).json()
+    assert {i["status"] for i in mixed["items"]} <= {"MANUAL_REVIEW", "DRAFT"}
+    assert rig.application["id"] in {i["id"] for i in mixed["items"]}
+    assert mixed["total"] == page["total"] + drafts["total"]
+    stamps = [(i["updated_at"], i["id"]) for i in mixed["items"]]
+    assert stamps == sorted(stamps)
+    assert actors.bank.get(QUEUE, params={"status": "UNKNOWN"}).status_code == 422
     assert actors.first.get(QUEUE).status_code == 403
     assert actors.first.get(bank_path(rig.application)).status_code == 403
     assert actors.bank.get(f"{QUEUE}/{uuid4()}").status_code == 404
