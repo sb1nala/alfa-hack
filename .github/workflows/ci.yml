@@ -1,0 +1,146 @@
+name: Project CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: project-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      AUTH_COOKIE_SECURE: 'false'
+      AUTH_ALLOWED_ORIGIN: http://localhost:8080
+      UV_PYTHON_DOWNLOADS: never
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: '0.12.23'
+          enable-cache: false
+      - name: Ephemeral credentials
+        run: |
+          python - <<'PY'
+          import os, secrets
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              for name in ('POSTGRES_PASSWORD', 'AUTH_JWT_SECRET'):
+                  value = secrets.token_urlsafe(48)
+                  print(f'::add-mask::{value}')
+                  output.write(f'{name}={value}\n')
+          PY
+      - name: Start isolated PostgreSQL 16
+        run: |
+          docker run --detach --name "backend-tests-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            -e POSTGRES_PASSWORD -e POSTGRES_USER -e POSTGRES_DB \
+            -p 127.0.0.1:5432:5432 \
+            --health-cmd 'pg_isready -U postgres -d postgres' \
+            --health-interval 2s --health-timeout 3s --health-retries 30 \
+            postgres:16-bookworm
+          for attempt in {1..45}; do
+            status=$(docker inspect --format '{{.State.Health.Status}}' "backend-tests-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}")
+            if [ "$status" = healthy ]; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - name: Locked dependencies
+        working-directory: backend
+        run: uv sync --locked
+      - name: Ruff check (including decision)
+        working-directory: backend
+        run: uv run --locked ruff check . ../scripts
+      - name: Backend format (decision owned by risks is excluded)
+        working-directory: backend
+        run: uv run --locked ruff format --check . ../scripts --extend-exclude app/decision
+      - name: OpenAPI is current
+        working-directory: backend
+        run: uv run --locked python -m app.export_openapi --check
+      - name: Full pytest with PostgreSQL and migration roundtrips
+        working-directory: backend
+        shell: bash
+        run: |
+          set -o pipefail
+          uv run --locked pytest -vv --run-postgres -o faulthandler_timeout=60 \
+            --junitxml="$RUNNER_TEMP/pytest.xml" 2>&1 \
+            | python ../scripts/ci_reports.py - --stream --safe-copy ../artifacts/backend/pytest-output.txt
+      - name: No unexpectedly skipped tests
+        run: python scripts/ci_reports.py "$RUNNER_TEMP/pytest.xml" --check-pytest
+      - name: Prepare safe failure report
+        id: backend_report
+        if: failure()
+        run: |
+          if [ -f "$RUNNER_TEMP/pytest.xml" ]; then
+            python scripts/ci_reports.py "$RUNNER_TEMP/pytest.xml" --safe-copy artifacts/backend/pytest.txt
+          fi
+          python scripts/ci_reports.py artifacts/backend --audit
+      - name: Remove test database container and its anonymous volume
+        if: always()
+        run: docker rm --force --volumes "backend-tests-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: failure() && steps.backend_report.outcome == 'success'
+        with:
+          name: backend-diagnostics
+          path: artifacts/backend/*.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
+  product:
+    name: Clean Docker product
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      REQUIRE_UI_SSE: '1'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: frontend/.node-version
+      - name: Isolated browser tools (outside backend runtime)
+        run: |
+          npm install --prefix "$RUNNER_TEMP/browser-tools" --no-audit --no-fund --save-exact playwright@1.57.0
+          "$RUNNER_TEMP/browser-tools/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Original Compose build, nginx API, persistence, native SSE and working UI
+        run: |
+          export PLAYWRIGHT_MODULE="$RUNNER_TEMP/browser-tools/node_modules/playwright"
+          python scripts/ci_product.py run \
+            --state-dir "$RUNNER_TEMP/product-state" --report-dir artifacts/product
+      - name: Always remove only this stand's resources
+        if: always()
+        run: |
+          python scripts/ci_product.py cleanup \
+            --state-dir "$RUNNER_TEMP/product-state" --report-dir artifacts/product
+      - name: Audit diagnostics before upload
+        id: product_report
+        if: failure()
+        run: python scripts/ci_reports.py artifacts/product --audit
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: failure() && steps.product_report.outcome == 'success'
+        with:
+          name: product-diagnostics
+          path: artifacts/product/*.log
+          if-no-files-found: ignore
+          retention-days: 7
