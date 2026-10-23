@@ -36,6 +36,16 @@ def new_page(browser, video=False) -> Page:
     return browser.new_context(**options).new_page()
 
 
+def close_named(page: Page, name: str):
+    """Закрывает вкладку; если шла запись, сохраняет видео как qa/video/<name>.webm."""
+    video = page.video
+    page.context.close()
+    if video:
+        src = Path(video.path())
+        if src.exists():
+            src.replace(VIDEO / f"{name}.webm")
+
+
 def shot(page: Page, name: str):
     OUT.mkdir(parents=True, exist_ok=True)
     page.screenshot(path=str(OUT / f"{name}.png"), full_page=True)
@@ -103,7 +113,7 @@ def scenario_approve(browser):
     page.get_by_role("button", name=T["signing"]["sign"]).click()
     wait_title(page, "ISSUED", timeout=30_000)
     shot(page, "approve-07-issued")
-    page.context.close()
+    close_named(page, "01-odobrenie-do-vydachi")
 
 
 def scenario_outcome(browser, login_name: str, status: str):
@@ -125,7 +135,7 @@ def scenario_bki(browser):
     shot(page, "demo-bki-checking-slow")
     wait_title(page, "APPROVED")
     shot(page, "demo-bki-decision-approved")
-    page.context.close()
+    close_named(page, "03-sboy-bki")
 
 
 def scenario_manual(browser):
@@ -177,8 +187,8 @@ def _scenario_manual(browser, pages):
     client.bring_to_front()
     wait_title(client, "COUNTER_OFFER", timeout=30_000)
     shot(client, "manual-06-client-sees-counter-offer")
-    bank.context.close()
-    client.context.close()
+    close_named(bank, "02-analitik-bank")
+    close_named(client, "02-analitik-klient")
 
 
 def main():
