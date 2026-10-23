@@ -68,7 +68,7 @@ export function BankApplicationPage() {
                   {[...decisions].reverse().map((decision) => (
                     <Box key={decision.public.id}>
                       <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                        <StatusChip status={decision.public.outcome} />
+                        <StatusChip status={decision.public.outcome} bank />
                         <Typography variant="body2" color="text.secondary">
                           {decision.source === 'underwriter' ? 'Решение аналитика' : 'Автоматическое решение'}
                           {' · '}{formatDate(decision.public.created_at)}

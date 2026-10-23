@@ -69,7 +69,7 @@ export function BankQueuePage() {
                   sx={{ cursor: 'pointer' }}
                 >
                   <TableCell sx={{ fontWeight: 500 }}>{item.company_name ?? '—'}</TableCell>
-                  <TableCell><StatusChip status={item.status} /></TableCell>
+                  <TableCell><StatusChip status={item.status} bank /></TableCell>
                   <TableCell>{dateTime(item.updated_at)}</TableCell>
                 </TableRow>
               ))}
