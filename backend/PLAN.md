@@ -1,16 +1,15 @@
 # Бэкенд: план реализации и текущий статус
 
-> Обновлено: 22 октября 2026. Проверяемый main —
-> [`d1de96c`](https://github.com/sb1nala/alfa-hack/commit/d1de96c).
-> **B01–B09, B11 и B12 — Готово; B10 — На ревью (строгий прогон после #85 зелёный).**
-> **B13 — На ревью:** после исправления диагностики оба jobs прошли на `16525ca` (557 backend-тестов без skips); отменённый повтор сохранён в истории отчёта.
-> Основание: [#77](https://github.com/sb1nala/alfa-hack/issues/77).
-> PR #58 и код B08 из коммита 333cc6c
-> фактически слиты; B08 включён владельцем в [PR #64](https://github.com/sb1nala/alfa-hack/pull/64).
-> PR #64 и [#65](https://github.com/sb1nala/alfa-hack/pull/65) слиты; B08 готов.
-> B09/#69 и [B10 PR #82](https://github.com/sb1nala/alfa-hack/pull/82) фактически слиты.
-> Слияние проверочных скриптов #82 не означает приёмку B10.
-> В main работает сквозной путь до решения и клиентской карточки.
+> Обновлено: 23 октября 2026 (UTC). Проверенный свежий main —
+> [`1c93ac7c32e644667e99959109b90a04cf6403aa`](https://github.com/sb1nala/alfa-hack/commit/1c93ac7c32e644667e99959109b90a04cf6403aa).
+> **B01–B13 — техническая реализация готова и слита.** B10/#82, B13/#84,
+> frontend SSE/#85 и API review_reason/#89 фактически в main.
+> [CI этого main](https://github.com/sb1nala/alfa-hack/actions/runs/39926680775):
+> Backend checks — success (576 passed, без skips), Clean Docker product — success.
+> Отдельно подтверждено восстановление API/worker после реальной остановки БД/мока.
+> **Общая QA-приёмка не завершена:** восстановление рабочего React UI после потери
+> сети/CLOSED/502 проверяет frontend/QA; required checks включает тимлид.
+> [Матрица доказательств, ограничения и рекомендации #6/#9/#77/#88](ACCEPTANCE-REPORT.md).
 
 ## Что уже доступно команде
 
@@ -75,10 +74,10 @@ B05 явно импортирует 10 аккаунтов, 9 компаний и
 | B07 | Готово | Worker, проверки и восстановление заданий | B06; моки рисков | [PR #57](https://github.com/sb1nala/alfa-hack/pull/57); часть [#5](https://github.com/sb1nala/alfa-hack/issues/5) |
 | B08 | Готово | Настоящий decide(), пять исходов, атомарное сохранение, fencing и диагностика | B07/#58; модуль рисков | [PR #64](https://github.com/sb1nala/alfa-hack/pull/64), слит; отчёт [#65 слит](https://github.com/sb1nala/alfa-hack/pull/65); продолжение #5 |
 | B09 | Готово (сервер) | История и настоящий SSE, #69 слит | B04, B06–B08; nginx фронтенда | [PR #69](https://github.com/sb1nala/alfa-hack/pull/69); [#6](https://github.com/sb1nala/alfa-hack/issues/6) открыт, UI отдельно |
-| B10 | На ревью | Строгий оркестратор, API, EventSource, UI и сохранность; [отчёт](B10-REPORT.md) | #76 исправлен в #83, SSE включён в #85; строгий CI PASS | [PR #82 слит](https://github.com/sb1nala/alfa-hack/pull/82); #8 закрыт ранее, часть #9 |
+| B10 | Готово (backend) | Строгий оркестратор, API, EventSource, UI и сохранность; [отчёт](B10-REPORT.md) | #76 исправлен в #83, SSE включён в #85; CI main 1c93ac7 PASS, расширенная QA UI отдельно | [PR #82 слит](https://github.com/sb1nala/alfa-hack/pull/82); #8 закрыт ранее, часть #9 |
 | B11 | Готово | Предложения, документы, дополнительные данные; подписание и симуляция выдачи из B12 | B08; форматы рисков | [PR #66](https://github.com/sb1nala/alfa-hack/pull/66) |
 | B12 | Готово | Очередь, банковская карточка и ручные решения (подписание и выдача — в B11) | B08, B11 | [PR #67](https://github.com/sb1nala/alfa-hack/pull/67), слит в ветку B11 |
-| B13 | На ревью | PR/push/manual CI, полный PostgreSQL pytest, строгий Docker/nginx; [отчёт B13](B13-REPORT.md) | Оба jobs PASS на 16525ca после #85 и исправления диагностики; ревью и branch protection тимлида | [PR #84](https://github.com/sb1nala/alfa-hack/pull/84); [#77](https://github.com/sb1nala/alfa-hack/issues/77), #9 |
+| B13 | Готово (реализация) | PR/push/manual CI, полный PostgreSQL pytest, строгий Docker/nginx; [отчёт B13](B13-REPORT.md) | Оба jobs PASS на main 1c93ac7; required checks ещё включает тимлид | [PR #84 слит](https://github.com/sb1nala/alfa-hack/pull/84); [#77](https://github.com/sb1nala/alfa-hack/issues/77), #9 |
 
 ### B03. Модели БД и Alembic — готово
 
@@ -432,14 +431,14 @@ risk_class, requested_dscr/offer_dscr, data_gaps, стоп-факторы, revie
   события, onopen/refetch, revision/id и восстановление CLOSED после 502 по README.
   Следующий этап бэкенда — B10; Issue #6 не закрывается автоматически.
 
-### B10. Сквозной запуск — На ревью; PR #82 слит
+### B10. Сквозной запуск — backend готов; PR #82 и #84 слиты
 
 - **Результат:** db, backend, worker, mocks и frontend поднимаются одной командой; readiness БД, однократные миграции и идемпотентный seed предшествуют работе сервисов.
 - **Файлы:** `docker-compose.yml`, проверочный скрипт на основе `scripts/check_docker.py`, интеграционные тесты и технические сведения для инструкции запуска.
 - **Готовность:** на чистой машине login → продукт → заявка → проверки → decide() → решение → SSE в браузере. Curl/API-прогон также проходит; данные сохраняются после рестарта. Проверяется восстановление после временного сбоя мока. Заглушка решения не засчитывается как интеграция.
 - **Факт на 4d77082:** #76 открыт и воспроизведён: неизменённый frontend падает на
   `api:check`. Основной `scripts/check_product_docker.py` не обходит ошибку сборки.
-  Это исторический результат; после #83/#85 строгий CI прошёл. Текущий статус — На ревью; [B10-REPORT.md](B10-REPORT.md).
+  Это исторический результат; после #83/#85 строгий CI прошёл. Текущий статус — backend готов; [приёмка main](ACCEPTANCE-REPORT.md), история в [B10-REPORT.md](B10-REPORT.md).
 - **Проверки:** переиспользованы продуктовый `run_e2e.py` и браузерный EventSource B09;
   добавлены документ с проверкой байтов, точный аудит, повторный migrate/seed,
   down/up с томами, отказ/возврат БД и сценарий рабочего UI без перезагрузки.
@@ -450,7 +449,7 @@ risk_class, requested_dscr/offer_dscr, data_gaps, стоп-факторы, revie
   Полная QA-приёмка восстановления самого UI остаётся отдельно от серверного smoke; #6 автоматически не закрывается.
 - **B13:** CI из предложения #77 реализован и прошёл после #85: чистая сборка,
   PostgreSQL pytest, OpenAPI/Ruff, продуктовый прогон и рабочий UI с SSE.
-  Следующий шаг — ревью #84 и required checks тимлида.
+  PR #84 слит; следующий шаг — required checks тимлида и отдельная QA UI.
 
 ### B11. Контрпредложение и дополнительные данные
 
@@ -464,10 +463,19 @@ risk_class, requested_dscr/offer_dscr, data_gaps, стоп-факторы, revie
 - **Файлы:** `backend/app/api/underwriting.py`, сервисы ручных решений и оформления, тесты.
 - **Готовность:** клиенту запрещены банковские операции; сохраняются автор, объяснения и аудит; повтор команды не дублирует выдачу. Банковскую часть можно реализовать 22.10 до документов B11; оформление — после принятия предложения.
 
-### B13. Техническая готовность к сдаче — На ревью
+### B13. Техническая готовность — реализация готова и слита; QA отдельно
 
-- **Текущий результат:** [Actions 39843083544](https://github.com/sb1nala/alfa-hack/actions/runs/39843083544) на `16525ca` — оба jobs PASS; backend 557 passed без skips, product API 10/10 и SSE рабочего UI. Безопасный вывод pytest теперь построчный; pipefail сохраняет ошибку тестов. Отмена `12fe47a` не повторилась, её первопричина по старому логу не установлена. B13 — На ревью, история и границы приёмки — в B13-REPORT.md.
-- **Предыдущий проверенный результат:** [PR #84](https://github.com/sb1nala/alfa-hack/pull/84) — На ревью. После включения #85 оба jobs [Actions 39838447107](https://github.com/sb1nala/alfa-hack/actions/runs/39838447107) на `1b3732d` прошли: backend 556 tests без skips, product — чистая сборка, API 10/10, persistence, серверный EventSource и SSE рабочего React UI. [B13-REPORT.md](B13-REPORT.md) сохраняет предыдущие красные результаты и границы QA-приёмки.
+- **Текущий результат:** [Actions 39926680775](https://github.com/sb1nala/alfa-hack/actions/runs/39926680775)
+  на main `1c93ac7` — оба jobs PASS; backend 576 passed без skips, исходный Docker,
+  API 10/10, сохранность и SSE рабочего UI в основном сценарии. PR #84 слит 23.10.
+  [Техническая приёмка](ACCEPTANCE-REPORT.md) отделяет готовность backend от QA React
+  при потере сети/CLOSED/502 и настройки required checks тимлидом.
+- **Исторический результат до merge #84:** [Actions 39843083544](https://github.com/sb1nala/alfa-hack/actions/runs/39843083544)
+  на `16525ca` — оба jobs PASS, 557 passed без skips; тогда B13 был на ревью.
+  Предыдущий [Actions 39838447107](https://github.com/sb1nala/alfa-hack/actions/runs/39838447107)
+  на `1b3732d` — оба jobs PASS, 556 tests, API 10/10, persistence и SSE UI.
+  Отмена `12fe47a` не повторилась; её первопричина неизвестна. История сохранена
+  в [B13-REPORT.md](B13-REPORT.md); безопасный потоковый вывод и pipefail сохранены.
 - **Результат:** независимый backend job и строгий product job без обхода #76, актуальный OpenAPI, команды и ограничения для документации продукта. Проверки добавляются в каждом PR, а не откладываются до B13.
 - **Вход:** [Issue #77](https://github.com/sb1nala/alfa-hack/issues/77), существующая
   QA-ветка `qa/e2e-stand`, команды B10. CI не реализуется повторно внутри B10.
@@ -509,8 +517,8 @@ risk_class, requested_dscr/offer_dscr, data_gaps, стоп-факторы, revie
 
 ## Дополнение после основного плана: Issue #88
 
-- **На ревью:** [PR #89](https://github.com/sb1nala/alfa-hack/pull/89), ветка
-  `feat/backend-review-reason` от свежего `main` `76a210e`.
+- **Готово, слито 23.10:** [PR #89](https://github.com/sb1nala/alfa-hack/pull/89),
+  merge commit `1c93ac7`; Issue #88 уже закрыт. Ветка реализации была от `76a210e`.
 - **Результат:** банковское `BankDecision.review_reason: string | null` читает причину
   из снимка конкретного решения MANUAL_REVIEW, сохраняя её после решения аналитика.
   Старые/некорректные данные и остальные исходы дают `null`; неизвестный непустой код
@@ -518,4 +526,6 @@ risk_class, requested_dscr/offer_dscr, data_gaps, стоп-факторы, revie
   OpenAPI и сгенерированный TypeScript синхронизированы; без миграций и пересчёта истории.
 - **Локальные проверки:** полный PostgreSQL 16 pytest — **576 passed**, без skips/errors;
   Ruff/format вне `app/decision`, OpenAPI `--check`, frontend `api:check`/`typecheck`/`build`,
-  `git diff --check` — PASS. Оба CI job — в Checks PR; общая приёмка B10/B13 отдельно.
+  `git diff --check` — PASS. Это исторические локальные проверки PR #89.
+  Текущий main `1c93ac7` отдельно подтверждён обоими CI jobs (576 backend-тестов);
+  [итоговая техническая приёмка](ACCEPTANCE-REPORT.md). Отображение причины — frontend.

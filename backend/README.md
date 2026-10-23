@@ -13,16 +13,18 @@ B09 реализует публичную историю и SSE из сохра�
 
 ## B10: штатный запуск и воспроизводимая проверка
 
-**Актуальный main `d1de96c`: #83 исправил типы, #85 подключил SSE рабочего клиента.**
-Оба jobs [Actions после #85 и исправления диагностики](https://github.com/sb1nala/alfa-hack/actions/runs/39843083544)
-прошли на `16525ca`: 557 backend-тестов без skips, чистая сборка, API 10/10,
-persistence, серверный EventSource и рабочий SPA до ISSUED без reload.
-React открыл успешный EventSource (1 запрос, 10 GET карточки).
-B10/B13 — **На ревью** в [PR #84](https://github.com/sb1nala/alfa-hack/pull/84).
+**Техническая приёмка на свежем main `1c93ac7` (23.10.2026): backend готов.**
+B10/#82, B13/#84, frontend SSE/#85 и API review_reason/#89 слиты.
+[CI этого main](https://github.com/sb1nala/alfa-hack/actions/runs/39926680775): оба jobs
+success, 576 backend-тестов без skips, чистая сборка, API 10/10, persistence,
+серверный EventSource и рабочий SPA до ISSUED без reload (1 EventSource / 11 GET).
+Отдельно проверено восстановление API/worker после остановки БД и мока без requeue.
 
-Граница smoke сохраняется: восстановление самого React UI при потере сети/CLOSED/502
-проверяется QA отдельно от тестового серверного EventSource.
-Исторические результаты: [B10-REPORT.md](B10-REPORT.md); текущие CI: [B13-REPORT.md](B13-REPORT.md).
+Общая QA-приёмка не завершена: восстановление самого React UI при потере сети/CLOSED/502
+проверяется frontend/QA отдельно. Required checks включает тимлид; полный endpoint
+защиты вернул 403, доступные branch metadata показывают protected=false, rulesets=[].
+[Итоговая матрица и рекомендации по Issues](ACCEPTANCE-REPORT.md).
+Исторические результаты: [B10-REPORT.md](B10-REPORT.md), [B13-REPORT.md](B13-REPORT.md).
 
 Нужны Docker Engine с BuildKit, Compose v2 с `additional_contexts`, Git и Python 3.12
 (Python нужен для проверок, продукт работает в контейнерах). Из корня репозитория:
@@ -130,7 +132,7 @@ Frontend Dockerfile такого секрета пока не поддержив
 onopen/refetch, revision/id, восстановления истории и CLOSED/502 в интерфейсе.
 Сборка при #76 обязана падать: `api:check` не отключается, временная регенерация
 типов и `--allow-stale-types` не используются. #76 уже исправлен владельцем в #83;
-После #85 этот CI-критерий пройден; B10/B13 переданы на ревью.
+После #85 этот CI-критерий пройден; B10/#82 и B13/#84 слиты, проверены на main `1c93ac7`.
 Расширенная QA-приёмка TS-10 сохраняет описанные выше границы smoke.
 
 Повтор backend локально из `backend/` (Python 3.12, uv 0.12.23):
@@ -191,8 +193,8 @@ Compose и состояние сервисов, если Docker уже их со
 **Clean Docker product** как required checks защиты `main`, проверить запуск
 Actions для PR и разрешение pinned Actions, сохранить review перед merge.
 Необходимы только `contents: read`, production secrets и `pull_request_target`
-не требуются. Эти настройки B13 сам не меняет. `workflow_dispatch` через UI будет
-доступен после появления workflow в default branch; PR-trigger работает до merge.
+не требуются. Эти настройки B13 сам не меняет. Workflow уже в default branch;
+`workflow_dispatch` доступен через Actions, PR-trigger также включён.
 Таймауты jobs — 20/35 минут, устаревшие прогоны одной ветки отменяются; очистка
 работает в runner и отдельном `always()` шаге. При жёстком уничтожении hosted runner
 ресурсы исчезают вместе с VM, глобальный Docker prune не применяется.
