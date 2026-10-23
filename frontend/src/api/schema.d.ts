@@ -388,7 +388,7 @@ export interface paths {
         };
         /**
          * Queue
-         * @description Банковская очередь. По умолчанию MANUAL_REVIEW; фильтр status, пагинация offset/limit. Сортировка updated_at ASC, id ASC. Доступ только underwriter.
+         * @description Банковская очередь. По умолчанию MANUAL_REVIEW. status можно повторить (?status=APPROVED&status=REJECTED) — заявки в любом из перечисленных статусов; пагинация offset/limit. Сортировка updated_at ASC, id ASC. Доступ только underwriter.
          */
         get: operations["queue_api_underwriter_applications_get"];
         put?: never;
@@ -3505,7 +3505,7 @@ export interface operations {
     queue_api_underwriter_applications_get: {
         parameters: {
             query?: {
-                status?: components["schemas"]["ApplicationStatus"];
+                status?: components["schemas"]["ApplicationStatus"][];
                 offset?: number;
                 limit?: number;
             };

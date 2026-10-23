@@ -6749,16 +6749,25 @@ paths:
       - underwriter
   /api/underwriter/applications:
     get:
-      description: Банковская очередь. По умолчанию MANUAL_REVIEW; фильтр status, пагинация offset/limit.
-        Сортировка updated_at ASC, id ASC. Доступ только underwriter.
+      description: Банковская очередь. По умолчанию MANUAL_REVIEW. status можно повторить (?status=APPROVED&status=REJECTED)
+        — заявки в любом из перечисленных статусов; пагинация offset/limit. Сортировка updated_at ASC,
+        id ASC. Доступ только underwriter.
       operationId: queue_api_underwriter_applications_get
       parameters:
       - in: query
         name: status
         required: false
         schema:
-          $ref: '#/components/schemas/ApplicationStatus'
-          default: MANUAL_REVIEW
+          default:
+          - MANUAL_REVIEW
+          examples:
+          - - MANUAL_REVIEW
+          items:
+            $ref: '#/components/schemas/ApplicationStatus'
+          maxItems: 13
+          minItems: 1
+          title: Status
+          type: array
       - in: query
         name: offset
         required: false

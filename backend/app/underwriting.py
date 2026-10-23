@@ -24,9 +24,11 @@ from app.transitions import lock_application, transition
 OFFER_OUTCOMES = frozenset({"APPROVED", "COUNTER_OFFER"})
 
 
-async def queue(db: AsyncSession, status: str, page: PageQuery) -> Page[UnderwriterQueueItem]:
+async def queue(
+    db: AsyncSession, statuses: list[str], page: PageQuery
+) -> Page[UnderwriterQueueItem]:
     # Oldest first: the analyst takes the application that has waited longest.
-    filtered = select(Application).where(Application.status == status).cte("filtered")
+    filtered = select(Application).where(Application.status.in_(statuses)).cte("filtered")
     paged = (
         select(filtered)
         .order_by(filtered.c.updated_at.asc(), filtered.c.id.asc())
