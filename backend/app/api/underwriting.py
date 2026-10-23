@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, Request
+from fastapi import APIRouter, Body, Depends, Query, Request
 
 from app import underwriting
 from app.api import examples as ex
@@ -23,8 +23,9 @@ router = APIRouter(prefix="/api/underwriter/applications", tags=["underwriting"]
     **endpoint(
         Page[UnderwriterQueueItem],
         {"queue": ex.page(ex.QUEUE_ITEM)},
-        "Банковская очередь. По умолчанию MANUAL_REVIEW; фильтр status, пагинация offset/limit. "
-        "Сортировка updated_at ASC, id ASC. Доступ только underwriter.",
+        "Банковская очередь. По умолчанию MANUAL_REVIEW. status можно повторить "
+        "(?status=APPROVED&status=REJECTED) — заявки в любом из перечисленных статусов; "
+        "пагинация offset/limit. Сортировка updated_at ASC, id ASC. Доступ только underwriter.",
         role="underwriter",
         implemented=True,
     ),
@@ -32,9 +33,12 @@ router = APIRouter(prefix="/api/underwriter/applications", tags=["underwriting"]
 async def queue(
     page: Annotated[PageQuery, Depends()],
     db: DBSession,
-    status: ApplicationStatus = ApplicationStatus.MANUAL_REVIEW,
+    status: Annotated[
+        list[ApplicationStatus],
+        Query(min_length=1, max_length=len(ApplicationStatus), examples=[["MANUAL_REVIEW"]]),
+    ] = [ApplicationStatus.MANUAL_REVIEW],  # noqa: B006 - FastAPI copies query defaults
 ) -> Page[UnderwriterQueueItem]:
-    return await underwriting.queue(db, status.value, page)
+    return await underwriting.queue(db, sorted({item.value for item in status}), page)
 
 
 @router.get(
@@ -84,6 +88,7 @@ async def bank_card(
                         "policy_version": None,
                         "scoring_factors": [],
                         "analytical_explanation": "Внутреннее объяснение",
+                        "review_reason": None,
                     },
                 ],
                 "allowed_actions": [],

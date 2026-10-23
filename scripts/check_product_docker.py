@@ -8,6 +8,7 @@ import importlib.util
 import json
 import os
 import secrets
+import signal
 import subprocess
 import sys
 import tempfile
@@ -71,7 +72,10 @@ def check_persistence(compose, env, origin):
     path = "/api/applications/" + app["id"]
     boundary = "b10-" + secrets.token_hex(16)
     content = b"%PDF-1.4\n% Synthetic B10 bank statement\n%%EOF\n"
-    fields = {"document_type": "bank_statement_12m", "expected_revision": str(app["revision"])}
+    fields = {
+        "document_type": "bank_statement_12m",
+        "expected_revision": str(app["revision"]),
+    }
     multipart = b"".join(
         f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode()
         for k, v in fields.items()
@@ -135,7 +139,10 @@ def check_persistence(compose, env, origin):
         "ISSUED",
     ], statuses
     assert any(e["event_type"] == "document_uploaded" for e in history["items"])
-    print("PASS document bytes, NEEDS_INFO resubmission, issuance and ordered audit", flush=True)
+    print(
+        "PASS document bytes, NEEDS_INFO resubmission, issuance and ordered audit",
+        flush=True,
+    )
 
     snapshot_sql = "SELECT " + ", ".join(
         f"(SELECT count(*) FROM {table})"
@@ -162,7 +169,8 @@ def check_persistence(compose, env, origin):
     run("run", "--rm", "migrate")
     assert sql(snapshot_sql) == before, "repeated migrate/seed changed row counts"
     print(
-        "PASS down/up with volumes: session, card/offer, audit, file, idempotent seed", flush=True
+        "PASS down/up with volumes: session, card/offer, audit, file, idempotent seed",
+        flush=True,
     )
 
     run("stop", "db")
@@ -195,7 +203,10 @@ def check_persistence(compose, env, origin):
     check_document()
     assert client.call("GET", path + "/history") == history
     assert sql(snapshot_sql) == before
-    print("PASS PostgreSQL ready=503/live=200, recovery and preserved product data", flush=True)
+    print(
+        "PASS PostgreSQL ready=503/live=200, recovery and preserved product data",
+        flush=True,
+    )
 
 
 def main():
@@ -204,7 +215,11 @@ def main():
     while len(ports) < 4:
         ports.add(str(free_port()))
     env.update(
-        zip(("FRONTEND_PORT", "BACKEND_PORT", "POSTGRES_PORT", "MOCKS_PORT"), ports, strict=True)
+        zip(
+            ("FRONTEND_PORT", "BACKEND_PORT", "POSTGRES_PORT", "MOCKS_PORT"),
+            ports,
+            strict=True,
+        )
     )
     env.update(
         COMPOSE_PROJECT_NAME="alfa-b10-" + secrets.token_hex(5),
@@ -224,7 +239,15 @@ def main():
     )
     # Product runner uses urllib's inherited NO_PROXY. Keep external proxy policy.
     env["NO_PROXY"] = env["no_proxy"] = ",".join(
-        filter(None, [env.get("NO_PROXY", ""), env.get("no_proxy", ""), "localhost", "127.0.0.1"])
+        filter(
+            None,
+            [
+                env.get("NO_PROXY", ""),
+                env.get("no_proxy", ""),
+                "localhost",
+                "127.0.0.1",
+            ],
+        )
     )
     compose = [
         "docker",
@@ -234,6 +257,27 @@ def main():
         "-f",
         str(ROOT / "docker-compose.yml"),
     ]
+    if state_path := env.get("PRODUCT_CI_STATE"):
+        # Only the CI wrapper reads this private file, never an artifact. Persist
+        # before the first Docker call so cancellation can clean up this project.
+        with open(state_path, "x", opener=lambda p, f: os.open(p, f, 0o600)) as state:
+            json.dump(
+                {
+                    "compose": compose,
+                    "env": {
+                        k: v
+                        for k, v in env.items()
+                        if k.startswith(("POSTGRES_", "AUTH_", "COMPOSE_PROJECT_NAME"))
+                        or k in ("FRONTEND_PORT", "BACKEND_PORT", "MOCKS_PORT")
+                    },
+                },
+                state,
+            )
+
+    def terminate(_signum, _frame):
+        raise SystemExit(143)
+
+    signal.signal(signal.SIGTERM, terminate)
 
     def run(*args):
         subprocess.run([*compose, *args], cwd=ROOT, env=env, check=True, timeout=900)
@@ -282,6 +326,18 @@ def main():
                 timeout=180,
             )
         print("PASS Compose/API/persistence/test EventSource/UI smoke; UI SSE acceptance separate")
+    except BaseException:
+        # The CI wrapper filters these lines before printing or saving them.
+        if state_path:
+            subprocess.run([*compose, "ps", "-a"], cwd=ROOT, env=env, check=False, timeout=30)
+            subprocess.run(
+                [*compose, "logs", "--no-color", "--timestamps", "--tail", "150"],
+                cwd=ROOT,
+                env=env,
+                check=False,
+                timeout=30,
+            )
+        raise
     finally:
         run("down", "--volumes", "--remove-orphans", "--timeout", "45")
 

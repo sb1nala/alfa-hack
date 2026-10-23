@@ -141,7 +141,11 @@ async def add_events(db, application_id, types=("application_updated",), ids=Non
             event_type=kind,
             previous_status="DRAFT" if kind == "status_changed" else None,
             public_message="Публичное сообщение №1 — заявка обновлена",
-            audit_payload={"private_marker": "SECRET_RISK", "risk_result": {"score": 999}},
+            audit_payload={
+                "private_marker": "SECRET_RISK",
+                "review_reason": "gray_zone",
+                "risk_result": {"score": 999, "review_reason": "gray_zone"},
+            },
         )
         await db.flush()
         if ids:
@@ -239,6 +243,7 @@ async def test_history_sequence_pagination_public_projection(live):
         )
         assert response.status_code == 200
         assert "SECRET_RISK" not in response.text
+        assert "review_reason" not in response.text and "risk_result" not in response.text
         page = response.json()
         pages.extend(page["items"])
         cursor = page["next_cursor"]
@@ -347,6 +352,7 @@ async def test_live_no_history_reconnect_exact_frames_and_headers(live, monkeypa
                 assert data["previous_status"] == "DRAFT"
             assert set(data) == expected
             assert "SECRET_RISK" not in fields["data"] and "message" not in data
+            assert "review_reason" not in fields["data"] and "risk_result" not in fields["data"]
             assert data["application_id"] == str(application_id)
         assert old[0] not in ids[1:]
     async with stream(client, application_id, ids[1]) as (_, lines):
@@ -656,6 +662,11 @@ async def test_preopen_db_failure_has_json_error(live, monkeypatch, failure):
 
 async def test_recheck_access_after_slow_heartbeat_before_event(live, monkeypatch):
     app, client, settings, *_ = live
+    # This test checks access revalidation after a slow send, not send timeout.
+    # A new DB connection + revocation commit can exceed the fixture's 0.3s
+    # budget on a busy runner, closing the stream before the heartbeat arrives.
+    # Keep the deadline bounded but leave room for that independent transaction.
+    settings.sse_send_timeout = 1.5
     await login(client)
     application_id = await new_application(app)
     ids = await write_events(app, application_id, ("application_updated",) * 3)

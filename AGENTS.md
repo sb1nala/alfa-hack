@@ -11,7 +11,7 @@
 ## Жёсткие ограничения кейса
 
 - Только веб, без мобильного приложения.
-- Никаких платных API, подписок и лицензий. LLM — только open-weights.
+- Никаких платных API, подписок и лицензий. Модели (LLM, OCR и др.) — только с открытыми весами; LLM подключается через OpenAI-совместимый API с настраиваемыми адресом, токеном и названием модели.
 - Весь сценарий внутри продукта: без email, SMS, мессенджеров.
 - Внешние сервисы (БКИ, ЕГРЮЛ/ЕГРИП, ФНС «Прозрачный бизнес») — только локальные моки из `mocks/`.
 - Данные только синтетические.
@@ -24,7 +24,7 @@
 | Бэкенд | Python 3.12, FastAPI, SQLAlchemy 2 (async), Alembic, PostgreSQL 16, uv (`uv.lock`), pytest |
 | Фронтенд | Vite, React 18, TypeScript, React Router, TanStack Query, MUI, pnpm (`pnpm-lock.yaml`) |
 | Моки | FastAPI, данные из JSON-фикстур |
-| Инфраструктура | Docker, docker compose: db, backend, worker, mocks, frontend (+ ollama по профилю `ai`) |
+| Инфраструктура | Docker, docker compose: db, migrate, backend, worker, mocks, frontend |
 
 ## Кто за какие папки отвечает
 

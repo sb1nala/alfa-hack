@@ -215,7 +215,8 @@ function DraftForm({ application }: { application: ClientApplication }) {
     <Stack spacing={3} sx={{ maxWidth: 760 }}>
       <Box>
         <Typography component="h1" variant="h4" sx={{ fontWeight: 700 }}>{t.form.title}</Typography>
-        {productName && <Chip label={productName} color="secondary" variant="outlined" sx={{ mt: 1.5 }} />}
+        {productName && <Chip label={productName} color="secondary" variant="outlined"
+          sx={{ mt: 1.5, color: 'secondary.dark', borderColor: 'secondary.main' }} />}
       </Box>
 
       <Paper variant="outlined" sx={{ p: { xs: 2.5, md: 4 } }}>

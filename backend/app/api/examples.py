@@ -141,6 +141,7 @@ BANK_APPLICATION = {
             "policy_version": None,
             "scoring_factors": [],
             "analytical_explanation": "Демонстрационное внутреннее объяснение, шкала не определена",
+            "review_reason": "gray_zone",
         }
     ],
     "allowed_actions": ["decide"],

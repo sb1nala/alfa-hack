@@ -15,7 +15,7 @@ import { StatusChip, statusColor } from '../../components/StatusChip.tsx';
 import { formatRub } from '../../lib/format.ts';
 import { productTexts, statusTexts, t } from '../../lib/texts.ts';
 
-const SLOW_CHECKING_MS = 10_000;
+const SLOW_CHECKING_MS = 4_000;
 
 /** Экран 5 (screen-map.md): таймлайн, карточка статуса, решение и SSE. */
 export function ApplicationPage() {
@@ -76,19 +76,16 @@ function StatusCard({ application }: { application: ClientApplication }) {
   );
 }
 
-/** true, если заявка дольше 10 с в CHECKING: отдельного события ретрая в контракте нет. */
+/** Порог продукта — 4 с в CHECKING; отдельного события ретрая в контракте нет. */
 function useSlowStatus(status: ClientApplication['status']): boolean {
-  const [since, setSince] = useState(() => Date.now());
-  const [now, setNow] = useState(() => Date.now());
+  const [slowStatus, setSlowStatus] = useState<ClientApplication['status'] | null>(null);
   useEffect(() => {
-    setSince(Date.now());
-  }, [status]);
-  useEffect(() => {
+    setSlowStatus(null);
     if (status !== 'CHECKING') return undefined;
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
-    return () => window.clearInterval(timer);
+    const timer = window.setTimeout(() => setSlowStatus('CHECKING'), SLOW_CHECKING_MS);
+    return () => window.clearTimeout(timer);
   }, [status]);
-  return status === 'CHECKING' && now - since > SLOW_CHECKING_MS;
+  return status === 'CHECKING' && slowStatus === status;
 }
 
 function CancelAction({ application }: { application: ClientApplication }) {

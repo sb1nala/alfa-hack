@@ -105,7 +105,7 @@ def test_counter_offer_shows_both_dscr_values():
     assert decision.requested_dscr == Decimal("0.33")
     assert decision.offer_dscr >= Decimal("1.2")
     factor = next(f for f in decision.scoring_factors if f.code == "dscr")
-    assert factor.value == "0.33"
+    assert factor.value == "0,33"
 
 
 def test_no_offer_means_no_offer_dscr():

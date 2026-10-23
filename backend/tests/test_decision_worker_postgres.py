@@ -177,6 +177,12 @@ async def test_real_decisions_all_outcomes_and_three_counteroffers(ready):
         "explanation",
         "required_documents",
     } | ({"offer"} if expected.offer else set())
+    bank = rig.actors.bank.get(f"/api/underwriter/applications/{rig.application['id']}")
+    assert bank.status_code == 200, bank.text
+    [bank_decision] = bank.json()["decisions"]
+    assert bank_decision["review_reason"] == data["review_reason"]
+    if expected.outcome != "MANUAL_REVIEW":
+        assert bank_decision["review_reason"] is None
     if expected.offer:
         assert len(offers) == 1
         offer = offers[0]

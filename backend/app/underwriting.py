@@ -24,9 +24,11 @@ from app.transitions import lock_application, transition
 OFFER_OUTCOMES = frozenset({"APPROVED", "COUNTER_OFFER"})
 
 
-async def queue(db: AsyncSession, status: str, page: PageQuery) -> Page[UnderwriterQueueItem]:
+async def queue(
+    db: AsyncSession, statuses: list[str], page: PageQuery
+) -> Page[UnderwriterQueueItem]:
     # Oldest first: the analyst takes the application that has waited longest.
-    filtered = select(Application).where(Application.status == status).cte("filtered")
+    filtered = select(Application).where(Application.status.in_(statuses)).cte("filtered")
     paged = (
         select(filtered)
         .order_by(filtered.c.updated_at.asc(), filtered.c.id.asc())
@@ -62,6 +64,14 @@ async def queue(db: AsyncSession, status: str, page: PageQuery) -> Page[Underwri
     )
 
 
+def saved_review_reason(row: Decision) -> str | None:
+    """Read this decision's snapshot, independently of the application's current status."""
+    if row.outcome != "MANUAL_REVIEW" or not isinstance(row.risk_result, dict):
+        return None
+    reason = row.risk_result.get("review_reason")
+    return reason if isinstance(reason, str) and reason.strip() else None
+
+
 async def bank_card(db: AsyncSession, application: Application) -> UnderwriterApplication:
     rows = await db.scalars(
         select(Decision)
@@ -76,6 +86,7 @@ async def bank_card(db: AsyncSession, application: Application) -> UnderwriterAp
             policy_version=row.policy_version,
             scoring_factors=row.scoring_factors,
             analytical_explanation=row.analytical_explanation or "Без аналитического комментария",
+            review_reason=saved_review_reason(row),
         )
         for row in list(rows)
     ]

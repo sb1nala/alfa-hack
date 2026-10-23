@@ -388,7 +388,7 @@ export interface paths {
         };
         /**
          * Queue
-         * @description Банковская очередь. По умолчанию MANUAL_REVIEW; фильтр status, пагинация offset/limit. Сортировка updated_at ASC, id ASC. Доступ только underwriter.
+         * @description Банковская очередь. По умолчанию MANUAL_REVIEW. status можно повторить (?status=APPROVED&status=REJECTED) — заявки в любом из перечисленных статусов; пагинация offset/limit. Сортировка updated_at ASC, id ASC. Доступ только underwriter.
          */
         get: operations["queue_api_underwriter_applications_get"];
         put?: never;
@@ -609,6 +609,11 @@ export interface components {
             policy_version: string | null;
             /** Public */
             public: components["schemas"]["ApprovedDecision"] | components["schemas"]["CounterOfferDecision"] | components["schemas"]["NeedsInfoDecision"] | components["schemas"]["ManualReviewDecision"] | components["schemas"]["RejectedDecision"];
+            /**
+             * Review Reason
+             * @description Только банку: причина MANUAL_REVIEW из сохранённого результата этого решения. Известные коды: gray_zone, collateral_review, documents_review, revenue_mismatch_review, incomplete_checks. Неизвестный непустой строковый код передаётся как есть; используйте analytical_explanation как fallback. Для остальных исходов, отсутствующего или некорректного значения — null.
+             */
+            review_reason: string | null;
             /** Scoring Factors */
             scoring_factors: components["schemas"]["ScoringFactor"][];
             /**
@@ -3500,7 +3505,7 @@ export interface operations {
     queue_api_underwriter_applications_get: {
         parameters: {
             query?: {
-                status?: components["schemas"]["ApplicationStatus"];
+                status?: components["schemas"]["ApplicationStatus"][];
                 offset?: number;
                 limit?: number;
             };

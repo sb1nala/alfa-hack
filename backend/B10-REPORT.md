@@ -1,7 +1,65 @@
 # B10: воспроизводимость Docker и интеграция
 
-Дата: 22.10.2026 (Москва). Статус: **заблокировано**,
-[draft PR #82](https://github.com/sb1nala/alfa-hack/pull/82), без слияния.
+## Текущий статус после итоговой технической приёмки, 23.10.2026 (UTC)
+
+**Реализация завершена и слита:** B10 [#82](https://github.com/sb1nala/alfa-hack/pull/82),
+B13 [#84](https://github.com/sb1nala/alfa-hack/pull/84), frontend SSE [#85](https://github.com/sb1nala/alfa-hack/pull/85),
+API review_reason [#89](https://github.com/sb1nala/alfa-hack/pull/89) по уже закрытому #88.
+Проверенный свежий main: `1c93ac7c32e644667e99959109b90a04cf6403aa`.
+[Project CI #15](https://github.com/sb1nala/alfa-hack/actions/runs/39926680775), push этого main:
+
+- [Backend checks — success](https://github.com/sb1nala/alfa-hack/actions/runs/39926680775/job/120324682397),
+  **576 passed**, без skips/failures/errors; Ruff/format/OpenAPI/миграции PASS.
+- [Clean Docker product — success](https://github.com/sb1nala/alfa-hack/actions/runs/39926680775/job/120324682864),
+  исходный Compose без обхода api:check, migrate/seed, API 10/10, PDF/аудит/тома,
+  возврат БД, серверный SSE (heartbeat 15002 мс/Last-Event-ID/replay),
+  React до ISSUED без reload, 1 EventSource и 11 GET карточки.
+- Отдельная адресная проверка на том же commit: реальная остановка мока и БД
+  во время обработки; прежние API/worker восстановились без requeue и дублей.
+
+**Backend технически готов; общая QA-приёмка не завершена.** Восстановление самого
+React UI при потере сети/CLOSED/502 остаётся frontend/QA, required checks — тимлиду.
+Детальная матрица доказательств, ограничения, DoD #9 и рекомендации #6/#9/#77/#88:
+[ACCEPTANCE-REPORT.md](ACCEPTANCE-REPORT.md). Настройки защиты не менялись.
+
+## История до слияния B13 — исходные результаты сохранены
+
+Все статусы «На ревью»/Draft и «слияние не выполнялось» ниже относятся к моменту
+соответствующего прогона. Они не являются текущим статусом слитых PR.
+
+Дата: 22.10.2026 (Москва). Статус: **На ревью** в
+[PR #84](https://github.com/sb1nala/alfa-hack/pull/84).
+[PR #82](https://github.com/sb1nala/alfa-hack/pull/82) фактически слит в main `4b0d556`.
+#76 исправлен в #83; SSE рабочего клиента реализован фронтендером в #85 и включён
+в ветку B13 коммитом `1b3732d234a2c825d444b6690dff068bb92c9ebf`.
+Актуальный проверенный code commit B13 — `16525ca7bbb283fed6d58fd1bdba5895de25fb6c`.
+
+[Строгий Actions после #85 и исправления диагностики](https://github.com/sb1nala/alfa-hack/actions/runs/39843083544):
+**Backend checks — PASS; Clean Docker product — PASS**.
+Исходный Compose build/up, штатный migrate/seed, API 10/10 через nginx,
+PDF/аудит, down/up с данными и сессией, повтор seed, отказ/возврат PostgreSQL,
+серверный Chromium EventSource и рабочий SPA до ISSUED без reload прошли.
+React установил успешный EventSource (`text/event-stream`): 1 запрос, 10 GET карточки.
+GET при действиях и инвалидациях сам по себе не означает polling.
+Критерии проверок не ослаблены, обходы api:check не использовались.
+
+Прогон подтверждает SSE в рабочем UI в основном сценарии; restart/recreate/replay
+проверяет отдельный тестовый EventSource. Полное восстановление самого React UI
+при потере сети/CLOSED/502 остаётся отдельной QA-проверкой: зелёный smoke не
+выдаётся за выполнение этой дополнительной проверки. В #85 есть отдельные frontend
+тесты восстановления; они не заменяют проверку полного стенда.
+
+Подробности и текущие результаты: [B13-REPORT.md](B13-REPORT.md).
+Backend pytest прошёл 557 тестов без skips. После отмены промежуточного CI
+исправлен потоковый безопасный вывод pytest; отмена не повторилась.
+Новых исправлений продукта в продолжении B13 не потребовалось. PR не слит;
+Issues автоматически не закрывались. Branch protection настраивает тимлид.
+
+## Исторический отчёт B10 до исправлений #83/#85
+
+Ниже сохранены результаты исходного commit
+`6efad96f822b236f0993a76da7e0caaa925ccfdd`. Указанные там блокеры и статусы
+относятся к этому commit; текущий успешный повтор приведён выше.
 
 ## Проверенный код и границы
 
@@ -209,6 +267,6 @@ status_changed; подписчик должен перечитывать кар�
 для него используется банковская карточка. Документы продукта не переписывались.
 
 После frontend-исправлений нужен повтор строгого исходного Compose-запуска и проверка
-SSE в UI, затем B10 можно переводить «На ревью». До этого draft PR не закрывает B10,
+SSE в UI, затем B10 можно переводить «На ревью». До этого факт слияния #82 не закрывает B10,
 #6/#76/#77. Полноценный CI в B10 не добавлен. Секреты, JWT/cookies и сырые чувствительные
 логи в этот отчёт не включены.
