@@ -287,6 +287,6 @@ docker compose start db                      # readiness восстанавли�
 | Тестовые сценарии | [`docs/test-scenarios.md`](docs/test-scenarios.md) | ✅ |
 | Live-статус по SSE в кабинете | backend [PR #69](https://github.com/sb1nala/alfa-hack/pull/69) | ⏳ TODO (@Фронтенд): поток на бэкенде готов и слит, кабинет пока обновляет статус опросом |
 | ML-модель challenger для аналитика | [#35](https://github.com/sb1nala/alfa-hack/issues/35) | ⏳ TODO (@Риски): опционально, на решение не влияет |
-| Прогон «как жюри» на чистой машине | [журнал](docs/test-scenarios.md#прогон-как-жюри) | ⏳ 22.10: логика 10/10, сборка стенда — блокер [#76](https://github.com/sb1nala/alfa-hack/issues/76) (@Фронтенд) |
+| Прогон «как жюри» на чистой машине | [журнал](docs/test-scenarios.md#прогон-как-жюри) | ✅ 22.10: «Быстрый старт» проходит, все исходы 10/10; ⏳ полировка UI — [#80](https://github.com/sb1nala/alfa-hack/issues/80) (@Фронтенд) |
 
 Если репозиторий приватный, доступ нужно выдать аккаунту жюри `alfa-hack-2026`.
