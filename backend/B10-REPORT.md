@@ -5,13 +5,14 @@
 [PR #82](https://github.com/sb1nala/alfa-hack/pull/82) фактически слит в main `4b0d556`.
 #76 исправлен в #83; SSE рабочего клиента реализован фронтендером в #85 и включён
 в ветку B13 коммитом `1b3732d234a2c825d444b6690dff068bb92c9ebf`.
+Актуальный проверенный code commit B13 — `16525ca7bbb283fed6d58fd1bdba5895de25fb6c`.
 
-[Строгий Actions после #85](https://github.com/sb1nala/alfa-hack/actions/runs/39838447107):
+[Строгий Actions после #85 и исправления диагностики](https://github.com/sb1nala/alfa-hack/actions/runs/39843083544):
 **Backend checks — PASS; Clean Docker product — PASS**.
 Исходный Compose build/up, штатный migrate/seed, API 10/10 через nginx,
 PDF/аудит, down/up с данными и сессией, повтор seed, отказ/возврат PostgreSQL,
 серверный Chromium EventSource и рабочий SPA до ISSUED без reload прошли.
-React установил успешный EventSource (`text/event-stream`): 1 запрос, 11 GET карточки.
+React установил успешный EventSource (`text/event-stream`): 1 запрос, 10 GET карточки.
 GET при действиях и инвалидациях сам по себе не означает polling.
 Критерии проверок не ослаблены, обходы api:check не использовались.
 
@@ -22,6 +23,8 @@ GET при действиях и инвалидациях сам по себе �
 тесты восстановления; они не заменяют проверку полного стенда.
 
 Подробности и текущие результаты: [B13-REPORT.md](B13-REPORT.md).
+Backend pytest прошёл 557 тестов без skips. После отмены промежуточного CI
+исправлен потоковый безопасный вывод pytest; отмена не повторилась.
 Новых исправлений продукта в продолжении B13 не потребовалось. PR не слит;
 Issues автоматически не закрывались. Branch protection настраивает тимлид.
 

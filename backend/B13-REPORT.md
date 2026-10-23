@@ -1,11 +1,13 @@
 # B13: CI и техническая готовность
 
-22.10.2026 (Москва). **В работе: диагностика отмены повторного backend job**, [PR #84](https://github.com/sb1nala/alfa-hack/pull/84).
+22.10.2026 (Москва). **На ревью: повтор после исправления диагностики прошёл**, [PR #84](https://github.com/sb1nala/alfa-hack/pull/84).
 Ветка `feat/backend-ci` создана от `4b0d556`; #83 устранил рассинхронизацию типов,
 #85 реализовал SSE рабочего клиента. Изменения #85 включены в проверенный commit
 `1b3732d234a2c825d444b6690dff068bb92c9ebf`; main после #85 — `d1de96c`.
-На проверенном code commit оба обязательных jobs [Actions 39838447107](https://github.com/sb1nala/alfa-hack/actions/runs/39838447107)
-**прошли**. Ранее зафиксированный блокер polling снят; критерии не ослаблялись.
+На актуальном проверенном code commit `16525ca7bbb283fed6d58fd1bdba5895de25fb6c`
+оба обязательных jobs [Actions 39843083544](https://github.com/sb1nala/alfa-hack/actions/runs/39843083544)
+**прошли** после улучшения диагностики. Первый зелёный прогон после #85
+на `1b3732d` сохранён ниже. Ранее зафиксированный блокер polling снят; критерии не ослаблялись.
 #82 фактически слит. B10/B13 передаются на ревью; слияние #84 не выполнялось.
 
 ## Что реализовано
@@ -159,5 +161,32 @@ Bash `pipefail` сохраняет ошибку pytest при успешной �
 20-минутный job timeout, полный --run-postgres, JUnit gate и все критерии сохранены.
 Локальные safety tests: **8 passed**, включая проверку ненулевого кода pipeline
 и отсутствия credentials в console/artifact. Ruff и actionlint проходят.
-После исправления диагностики выполняются полный локальный и GitHub прогоны;
-до фактического успеха обоих jobs PR остаётся Draft.
+После исправления диагностики полный локальный прогон: **557 passed, 1 прежнее
+warning, 172,02 с**, JUnit без skips/failures/errors. Временный контейнер и БД удалены.
+
+## Итог повтора после исправления диагностики
+
+Проверенный code commit: `16525ca7bbb283fed6d58fd1bdba5895de25fb6c`.
+[Actions 39843083544](https://github.com/sb1nala/alfa-hack/actions/runs/39843083544):
+
+| Проверка | Факт |
+| --- | --- |
+| Backend checks | **PASS**, 557 passed, 1 прежнее warning, 210,87 с; JUnit без skips/failures/errors |
+| Clean Docker product | **PASS** |
+| Исходная сборка, up, штатные migrate/seed | **PASS**, без обхода api:check и ручной подготовки БД |
+| API через nginx | **PASS 10/10** |
+| PDF bytes, NEEDS_INFO, выдача, точный аудит | **PASS** |
+| Down/up с томами/сессией/файлом; повтор seed; отказ/возврат БД | **PASS** |
+| Серверный EventSource | **PASS**, heartbeat 15003 мс, native Last-Event-ID, restart/recreate/DNS, live и replay |
+| Реальный React UI | **PASS**, до ISSUED без reload, 1 EventSource с text/event-stream, 10 GET карточки |
+| Адресная очистка обоих jobs | **PASS** |
+
+Отмена предыдущего прогона не повторилась. Её первопричину старый лог не позволяет
+установить; изменение исправляет наблюдаемость CI, а не объявляет исправленным
+неподтверждённый дефект продукта. Полный pytest, запрет skips, --locked,
+REQUIRE_UI_SSE=1 и job timeout 20/35 минут сохранены.
+
+B10/B13 — **На ревью**. Следующий commit обновляет только технические документы;
+его собственный автоматический CI проверяется перед снятием Draft. Окончательная
+QA-приёмка устойчивости React UI сохраняет описанную выше границу smoke.
+Слияние #84, закрытие Issues и настройка branch protection не выполнялись.
