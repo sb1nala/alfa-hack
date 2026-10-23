@@ -242,6 +242,15 @@ components:
           - $ref: '#/components/schemas/ManualReviewDecision'
           - $ref: '#/components/schemas/RejectedDecision'
           title: Public
+        review_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: 'Только банку: причина MANUAL_REVIEW из сохранённого результата этого решения.
+            Известные коды: gray_zone, collateral_review, documents_review, revenue_mismatch_review, incomplete_checks.
+            Неизвестный непустой строковый код передаётся как есть; используйте analytical_explanation
+            как fallback. Для остальных исходов, отсутствующего или некорректного значения — null.'
+          title: Review Reason
         scoring_factors:
           items:
             $ref: '#/components/schemas/ScoringFactor'
@@ -260,6 +269,7 @@ components:
       - policy_version
       - scoring_factors
       - analytical_explanation
+      - review_reason
       title: BankDecision
       type: object
     Body_upload_document_api_applications__application_id__documents_post:
@@ -7026,6 +7036,7 @@ paths:
                       author_id: null
                       policy_version: null
                       public: *id005
+                      review_reason: gray_zone
                       scoring_factors: []
                       source: automatic
               schema:
@@ -7348,6 +7359,7 @@ paths:
                         outcome: MANUAL_REVIEW
                         reasons: *id008
                         required_documents: *id009
+                      review_reason: gray_zone
                       scoring_factors: []
                       source: automatic
                     - analytical_explanation: Внутреннее объяснение
@@ -7361,6 +7373,7 @@ paths:
                         outcome: APPROVED
                         reasons: *id008
                         required_documents: *id009
+                      review_reason: null
                       scoring_factors: []
                       source: underwriter
               schema:

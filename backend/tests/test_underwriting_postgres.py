@@ -110,12 +110,22 @@ async def test_queue_card_and_role_boundaries(review):
     [automatic] = card["decisions"]
     assert automatic["source"] == "automatic" and automatic["author_id"] is None
     assert automatic["policy_version"] and automatic["analytical_explanation"]
+    assert automatic["review_reason"] == "gray_zone"
+
+    async def saved_reason(db):
+        row = await db.get(Decision, UUID(automatic["public"]["id"]))
+        return row.risk_result["review_reason"]
+
+    assert await in_rig(rig, saved_reason) == automatic["review_reason"]
     assert automatic["scoring_factors"] and all(
         set(f) == {"code", "value", "contribution", "explanation"}
         for f in automatic["scoring_factors"]
     )
     assert automatic["public"] == card["application"]["decision"]
     assert set(automatic["public"]) == PUBLIC_KEYS
+    for public_payload in (card["application"], automatic["public"]):
+        assert "review_reason" not in str(public_payload)
+        assert "risk_result" not in str(public_payload)
     payload = body(rig, "REJECTED")
     second = headers(csrf(actors.second))
     assert decide(rig, payload, client=actors.first, h=actors.h).status_code == 403
@@ -139,6 +149,8 @@ async def test_four_manual_outcomes_are_appended_audited_and_public(review, outc
     assert card["allowed_actions"] == []
     automatic, manual = card["decisions"]
     assert automatic == rig.card["decisions"][0]
+    assert automatic["review_reason"] == "gray_zone"
+    assert manual["review_reason"] is None
     me = actors.bank.get("/api/auth/me").json()["id"]
     assert manual["source"] == "underwriter" and manual["author_id"] == me
     assert manual["policy_version"] is None and manual["scoring_factors"] == []
@@ -179,11 +191,83 @@ async def test_four_manual_outcomes_are_appended_audited_and_public(review, outc
         assert offer.product_snapshot["code"] == "express"
         assert str(offer.annual_rate_percent) == "25.5"
 
+    # Even a snapshot with a reason must not expose it for a non-review outcome.
+    async def add_stale_reason(db):
+        await db.execute(
+            update(Decision)
+            .where(Decision.id == row.id)
+            .values(risk_result={"review_reason": "documents_review"})
+        )
+
+    await in_rig(rig, add_stale_reason)
+    reread = actors.bank.get(bank_path(rig.application)).json()
+    assert reread == card
+    assert "review_reason" not in str(actors.first.get(path(rig.application)).json())
+    assert "risk_result" not in str(actors.first.get(path(rig.application)).json())
+
     if outcome in {"APPROVED", "COUNTER_OFFER"}:
         accept = {"expected_revision": application["revision"], "offer_id": public["offer"]["id"]}
         accepted = post(actors, application, "accept-offer", accept).json()
         sign = {**accept, "expected_revision": accepted["revision"], "consent": True}
         assert post(actors, application, "sign", sign).json()["status"] == "ISSUED"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("company_key", ["manual"])
+@pytest.mark.parametrize(
+    ("snapshot", "expected"),
+    [
+        pytest.param(None, None, id="legacy-null-snapshot"),
+        pytest.param({}, None, id="legacy-missing-field"),
+        pytest.param({"score": 175, "risk_class": "D"}, None, id="no-inference-from-score"),
+        pytest.param([], None, id="snapshot-array"),
+        pytest.param("gray_zone", None, id="snapshot-string"),
+        pytest.param(123, None, id="snapshot-number"),
+        pytest.param({"review_reason": None}, None, id="null-reason"),
+        pytest.param({"review_reason": 123}, None, id="numeric-reason"),
+        pytest.param({"review_reason": True}, None, id="boolean-reason"),
+        pytest.param({"review_reason": []}, None, id="array-reason"),
+        pytest.param({"review_reason": {}}, None, id="object-reason"),
+        pytest.param({"review_reason": ""}, None, id="empty-reason"),
+        pytest.param({"review_reason": " \t\n"}, None, id="blank-reason"),
+        *[
+            pytest.param({"review_reason": code}, code, id=code)
+            for code in (
+                "gray_zone",
+                "collateral_review",
+                "documents_review",
+                "revenue_mismatch_review",
+                "incomplete_checks",
+                "future_review_code",
+            )
+        ],
+    ],
+)
+async def test_review_reason_uses_saved_snapshot_safely(review, snapshot, expected):
+    rig = review
+    decision_id = UUID(rig.card["decisions"][0]["public"]["id"])
+
+    async def replace_snapshot(db):
+        await db.execute(
+            update(Decision).where(Decision.id == decision_id).values(risk_result=snapshot)
+        )
+
+    await in_rig(rig, replace_snapshot)
+    response = rig.actors.bank.get(bank_path(rig.application))
+    assert response.status_code == 200, response.text
+    [decision] = response.json()["decisions"]
+    assert decision["review_reason"] == expected
+    assert "risk_result" not in decision
+    assert set(decision["public"]) == PUBLIC_KEYS
+    public_card = rig.actors.first.get(path(rig.application))
+    assert public_card.status_code == 200
+    assert "review_reason" not in public_card.text and "risk_result" not in public_card.text
+
+    async def stored_snapshot(db):
+        return (await db.get(Decision, decision_id)).risk_result
+
+    # Reading old snapshots never recalculates or repairs historical data.
+    assert await in_rig(rig, stored_snapshot) == snapshot
 
 
 @pytest.mark.anyio

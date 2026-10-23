@@ -609,6 +609,11 @@ export interface components {
             policy_version: string | null;
             /** Public */
             public: components["schemas"]["ApprovedDecision"] | components["schemas"]["CounterOfferDecision"] | components["schemas"]["NeedsInfoDecision"] | components["schemas"]["ManualReviewDecision"] | components["schemas"]["RejectedDecision"];
+            /**
+             * Review Reason
+             * @description Только банку: причина MANUAL_REVIEW из сохранённого результата этого решения. Известные коды: gray_zone, collateral_review, documents_review, revenue_mismatch_review, incomplete_checks. Неизвестный непустой строковый код передаётся как есть; используйте analytical_explanation как fallback. Для остальных исходов, отсутствующего или некорректного значения — null.
+             */
+            review_reason: string | null;
             /** Scoring Factors */
             scoring_factors: components["schemas"]["ScoringFactor"][];
             /**

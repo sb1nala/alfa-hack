@@ -84,6 +84,7 @@ async def bank_card(
                         "policy_version": None,
                         "scoring_factors": [],
                         "analytical_explanation": "Внутреннее объяснение",
+                        "review_reason": None,
                     },
                 ],
                 "allowed_actions": [],

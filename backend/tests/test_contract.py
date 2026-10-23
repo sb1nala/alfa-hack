@@ -307,7 +307,14 @@ def test_five_outcomes_and_four_manual_transitions():
 
 
 def test_client_schemas_cannot_reach_bank_fields():
-    forbidden = {"scoring_factors", "analytical_explanation", "contribution", "policy_version"}
+    forbidden = {
+        "scoring_factors",
+        "analytical_explanation",
+        "contribution",
+        "policy_version",
+        "review_reason",
+        "risk_result",
+    }
 
     def walk(node, seen=None):
         seen = set() if seen is None else seen
