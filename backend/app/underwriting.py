@@ -62,6 +62,14 @@ async def queue(db: AsyncSession, status: str, page: PageQuery) -> Page[Underwri
     )
 
 
+def saved_review_reason(row: Decision) -> str | None:
+    """Read this decision's snapshot, independently of the application's current status."""
+    if row.outcome != "MANUAL_REVIEW" or not isinstance(row.risk_result, dict):
+        return None
+    reason = row.risk_result.get("review_reason")
+    return reason if isinstance(reason, str) and reason.strip() else None
+
+
 async def bank_card(db: AsyncSession, application: Application) -> UnderwriterApplication:
     rows = await db.scalars(
         select(Decision)
@@ -76,6 +84,7 @@ async def bank_card(db: AsyncSession, application: Application) -> UnderwriterAp
             policy_version=row.policy_version,
             scoring_factors=row.scoring_factors,
             analytical_explanation=row.analytical_explanation or "Без аналитического комментария",
+            review_reason=saved_review_reason(row),
         )
         for row in list(rows)
     ]
