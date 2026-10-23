@@ -51,9 +51,24 @@
 
 ## Команды
 
-Появятся вместе с первым рабочим сервисом. Целевые:
+Подробности и варианты — в разделе README «Проверки и тесты». Рабочий образ backend не содержит pytest и тестов, поэтому `docker compose run --rm backend pytest` не работает: тесты запускаются из исходников через uv.
 
 ```bash
-docker compose up --build        # весь стенд
-docker compose run --rm backend pytest
+cp .env.example .env                       # один раз, затем задать AUTH_JWT_SECRET
+docker compose up --build --wait           # весь стенд: http://localhost:8080
+
+cd backend
+uv run --locked pytest -q                  # unit-тесты, включая decide() на всех синтетических компаниях
+docker compose up -d db                    # для интеграционных тестов нужна PostgreSQL 16
+uv run --locked --env-file ../.env pytest -q --run-postgres
+uv run --locked ruff check . ../scripts
+uv run --locked python -m app.export_openapi   # после изменения API: перегенерировать docs/openapi.yaml
+
+cd ../frontend
+pnpm install --frozen-lockfile && pnpm api:generate && pnpm test && pnpm build
+
+python3 scripts/check_docker.py            # сквозная проверка на отдельном стенде
+python3 api-collection/run_e2e.py          # все 9 компаний через API запущенного стенда
 ```
+
+В `main` можно слить только PR с зелёными CI-проверками `Backend checks` и `Clean Docker product` (`.github/workflows/ci.yml`): CI запускает полный pytest с PostgreSQL и собирает чистый Docker-стенд.
