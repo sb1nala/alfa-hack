@@ -141,7 +141,7 @@ flowchart LR
 | API | `GET /api/applications/{id}` + SSE `GET /api/applications/{id}/events`; `GET .../history` |
 | Тексты | `statuses.<STATUS>.{title,description,next}`; таймлайн — `statuses.*.timeline`; отзыв — `applications.cancel*` |
 | Live | при событии `status_changed` перечитать заявку. При обрыве SSE показать `errors.liveUpdatesLost` и переподключиться |
-| Долгий `CHECKING` | если статус не меняется дольше **4 с**, показать `statuses.CHECKING.slow`. Обычная проверка занимает ~1,5 с, повторы при сбое БКИ — ~9 с (прогон QA 22.10): при пороге 10 с плашку не видно. Отдельного события ретрая в контракте нет |
+| Долгий `CHECKING` | если статус не меняется дольше **4 с**, показать `statuses.CHECKING.slow`. Обычная проверка занимает ~1,5–2 с, повторы при сбое БКИ — ~9–11 с (прогоны QA 22–23.10): при пороге 10 с плашку не видно. Отдельного события ретрая в контракте нет |
 
 **Таймлайн — 6 шагов для клиента.** 13 статусов клиенту не показываем: технические сворачиваются в понятные этапы.
 
@@ -218,7 +218,7 @@ flowchart LR
   Возраст бизнеса   4 года    +40                │ Причина для клиента [код ▾]
   DSCR              1,1       −35                │ Основание решения* [_______]
   ...                                            │ [ Вынести решение ]
-Оценка ML-модели (не влияет на решение)          └
+(развитие: блок ML-модели, не в MVP)            └
   Вероятность дефолта 7,8% · расходится с правилами
 История и аудит ▸   Документы клиента ▸
 ```
@@ -228,7 +228,7 @@ flowchart LR
 | API | `GET /api/underwriter/applications/{id}` → `POST .../decision` (по исходу: `ManualApprovalRequest`, `ManualCounterOfferRequest`, `ManualNeedsInfoRequest`, `ManualRejectionRequest`) |
 | Тексты | `bank.card.*`, `bank.challenger.*`, `bank.decision.*`; причины для клиента — выпадающий список из `rejectionReasons` / `counterOfferReasons` / `requiredDocuments` |
 | После решения | тост `bank.decision.done` → возврат в очередь. Клиент видит решение по SSE |
-| ML-блок | показываем, только если бэк вернул данные challenger (#35) |
+| ML-блок | не в MVP (развитие, #35); тексты `bank.challenger.*` в словаре оставлены на будущее |
 | Рекомендация системы | при `MANUAL_REVIEW` — заголовок и пояснение из `manualReviewReasons[review_reason]`, а не клиентский текст статуса. Статус в заголовке карточки — один чип (`statuses.*.bank`) |
 | Класс риска | цвет чипа по [design-tokens](design-tokens.md#классы-риска): A–B тиффани, C нейтральный, D янтарь, E красный |
 
