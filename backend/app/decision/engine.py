@@ -10,7 +10,7 @@ import math
 from dataclasses import dataclass
 from decimal import ROUND_FLOOR, ROUND_HALF_UP, Decimal
 
-from app.decision import finance, texts
+from app.decision import finance, fmt, texts
 from app.decision.policy import (
     AMOUNT_ROUNDING,
     AUTO_CLASSES,
@@ -101,8 +101,8 @@ def decide(
     )
     result = score(application, egrul, pb, bki, fin.revenue, fin.cash_flow)
     summary = (
-        f"Класс {result.risk_class} ({result.score} баллов), "
-        f"DSCR запроса {result.dscr:.2f} по базовой ставке."
+        f"Класс {result.risk_class} ({fmt.points(result.score)}), "
+        f"DSCR запроса {fmt.number(result.dscr, 2)} по базовой ставке."
     )
 
     if result.risk_class not in AUTO_CLASSES:
@@ -172,7 +172,8 @@ def _check_data(application: ApplicationInput, pb: PbReport) -> Decision | None:
             if "bank_statement_12m" in documents:
                 review = (
                     REVIEW_REVENUE_MISMATCH,
-                    f"Выручка в анкете расходится с ФНС на {deviation:.0%}, приложена выписка.",
+                    f"Выручка в анкете расходится с ФНС на {fmt.percent(deviation)}, "
+                    "приложена выписка.",
                 )
             else:
                 needed += ["annual_revenue", "bank_statement_12m"]
@@ -279,7 +280,7 @@ def _terms(
             offer,
             result,
             fin,
-            f"{summary} Максимальная сумма по лимитам — {reduced:,.0f} ₽ "
+            f"{summary} Максимальная сумма по лимитам — {fmt.rub_exact(reduced)} "
             f"на {product.max_term_months} мес.",
         )
 
@@ -288,8 +289,8 @@ def _terms(
     return _rejected(
         (code,),
         result,
-        f"{summary} Подходящих условий нет: лимит по DSCR {dscr_limit:,.0f} ₽, "
-        f"по выручке {revenue_limit:,.0f} ₽.",
+        f"{summary} Подходящих условий нет: лимит по DSCR {fmt.rub_exact(dscr_limit)}, "
+        f"по выручке {fmt.rub_exact(revenue_limit)}.",
     )
 
 
@@ -367,8 +368,8 @@ def _with_offer(
         policy_version=POLICY_VERSION,
         **_bank_part(result),
         offer_dscr=_two_places(offer_dscr),
-        analytical_explanation=f"{analytical} DSCR предложения {offer_dscr:.2f} "
-        f"по ставке {offer.annual_rate_percent}%.",
+        analytical_explanation=f"{analytical} DSCR предложения {fmt.number(offer_dscr, 2)} "
+        f"по ставке {fmt.rate(offer.annual_rate_percent)}.",
     )
 
 
