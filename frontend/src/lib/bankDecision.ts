@@ -26,6 +26,7 @@ export type DecisionDraft = {
 const counterTexts = t.counterOfferReasons as unknown as Record<string, string>;
 const rejectionTexts = t.rejectionReasons as unknown as Record<string, { message: string; advice: string }>;
 const documentTexts = t.requiredDocuments as unknown as Record<string, { title: string; explanation: string }>;
+const reviewTexts = t.manualReviewReasons as unknown as Record<string, { title: string; explanation: string }>;
 
 const visible = (record: Record<string, unknown>) => Object.keys(record).filter((k) => !k.startsWith('_'));
 export const counterReasonCodes = visible(counterTexts);
@@ -143,4 +144,16 @@ export function riskClassColor(riskClass: string): 'success' | 'default' | 'warn
     case 'E': return 'error';
     default: return 'default';
   }
+}
+
+/**
+ * «Рекомендация системы» для MANUAL_REVIEW: причина из словаря продукта
+ * (manualReviewReasons[review_reason]). Неизвестный или пустой код — аналитический текст.
+ */
+export function reviewRecommendation(
+  reviewReason: string | null | undefined,
+  analytical: string,
+): { title: string | null; text: string } {
+  const known = reviewReason && !reviewReason.startsWith('_') ? reviewTexts[reviewReason] : undefined;
+  return known ? { title: known.title, text: known.explanation } : { title: null, text: analytical };
 }
