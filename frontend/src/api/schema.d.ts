@@ -439,6 +439,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/underwriter/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pipeline Stats
+         * @description Сводка конвейера для кабинета аналитика: заявки по статусам (кроме DRAFT), очередь ручной проверки и сколько ждёт самая старая заявка, доля решений без аналитика, время от отправки до первого решения (медиана и 90-й перцентиль), выданные кредиты и их сумма. Только агрегаты, без данных клиентов. Доступ только underwriter.
+         */
+        get: operations["pipeline_stats_api_underwriter_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -797,6 +817,13 @@ export interface components {
             /** Term Months */
             term_months?: number | null;
         };
+        /** DecisionTimeStats */
+        DecisionTimeStats: {
+            /** Median Seconds */
+            median_seconds: number | null;
+            /** P90 Seconds */
+            p90_seconds: number | null;
+        };
         /** Document */
         Document: {
             /**
@@ -911,6 +938,16 @@ export interface components {
              */
             status: "ok" | "unavailable";
         };
+        /** IssuedStats */
+        IssuedStats: {
+            /**
+             * Amount
+             * @description Сумма принятых предложений по выданным кредитам
+             */
+            amount: string;
+            /** Count */
+            count: number;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Login */
@@ -987,6 +1024,16 @@ export interface components {
             reasons: components["schemas"]["Reason"][];
             /** Required Documents */
             required_documents: components["schemas"]["RequiredDocument"][];
+        };
+        /** ManualQueueStats */
+        ManualQueueStats: {
+            /** Count */
+            count: number;
+            /**
+             * Oldest Waiting Seconds
+             * @description Сколько ждёт самая старая заявка в MANUAL_REVIEW; null, если очередь пуста
+             */
+            oldest_waiting_seconds: number | null;
         };
         /** ManualRejectionRequest */
         ManualRejectionRequest: {
@@ -1127,6 +1174,42 @@ export interface components {
             offset: number;
             /** Total */
             total: number;
+        };
+        /**
+         * PipelineStats
+         * @description Сводка конвейера для кабинета аналитика; только агрегаты, без данных клиентов.
+         */
+        PipelineStats: {
+            /**
+             * Automated
+             * @description Из decided: первое решение принято системой без передачи аналитику
+             */
+            automated: number;
+            /**
+             * By Status
+             * @description Все статусы, кроме DRAFT, в порядке конвейера; нулевые тоже
+             */
+            by_status: components["schemas"]["StatusCount"][];
+            /**
+             * Decided
+             * @description Заявки, по которым есть хотя бы одно решение
+             */
+            decided: number;
+            /** @description От первой отправки до первого решения системы, по заявкам с решением */
+            decision_time: components["schemas"]["DecisionTimeStats"];
+            /**
+             * Generated At
+             * Format: date-time
+             * @description ISO 8601 in UTC
+             */
+            generated_at: string;
+            /**
+             * In Progress
+             * @description Отправленные заявки, по которым ещё нет итога
+             */
+            in_progress: number;
+            issued: components["schemas"]["IssuedStats"];
+            manual_queue: components["schemas"]["ManualQueueStats"];
         };
         /** Product */
         Product: {
@@ -1269,6 +1352,12 @@ export interface components {
             previous_status: components["schemas"]["ApplicationStatus"];
             /** Revision */
             revision: number;
+            status: components["schemas"]["ApplicationStatus"];
+        };
+        /** StatusCount */
+        StatusCount: {
+            /** Count */
+            count: number;
             status: components["schemas"]["ApplicationStatus"];
         };
         /** SubmitRequest */
@@ -3775,6 +3864,104 @@ export interface operations {
             };
             /** @description Конфликт состояния, ревизии или ключа идемпотентности */
             409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Некорректные параметры запроса */
+            422: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Слишком много запросов */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Внутренняя ошибка */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    pipeline_stats_api_underwriter_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Успешный ответ */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineStats"];
+                };
+            };
+            /** @description Некорректный запрос */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Требуется вход */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Недостаточно прав или неверный CSRF-токен */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурс не найден или недоступен этому владельцу */
+            404: {
                 headers: {
                     "Cache-Control"?: "no-store";
                     "X-Request-ID"?: string;

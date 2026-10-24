@@ -6,7 +6,10 @@ import type { components } from './schema.d.ts';
 export type UnderwriterApplication = components['schemas']['UnderwriterApplication'];
 export type BankDecision = components['schemas']['BankDecision'];
 
+export type PipelineStats = components['schemas']['PipelineStats'];
+
 export const bankKeys = {
+  stats: ['underwriter', 'stats'] as const,
   queue: (status: string) => ['underwriter', 'queue', status] as const,
   card: (id: string) => ['underwriter', 'card', id] as const,
 };
@@ -46,5 +49,18 @@ export function useUnderwriterApplication(id: string) {
       if (!data) throw new ApiProtocolError();
       return data;
     },
+  });
+}
+
+/** Сводка конвейера: только агрегаты; обновляется вместе с очередью. */
+export function usePipelineStats() {
+  return useQuery({
+    queryKey: bankKeys.stats,
+    queryFn: async ({ signal }) => {
+      const { data } = await api.http.GET('/api/underwriter/stats', { signal });
+      if (!data) throw new ApiProtocolError();
+      return data;
+    },
+    refetchInterval: 10_000,
   });
 }

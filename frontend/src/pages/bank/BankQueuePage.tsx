@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useUnderwriterQueue } from '../../api/bank.ts';
+import { PipelineStatsPanel } from '../../components/bank/PipelineStatsPanel.tsx';
 import { ErrorAlert } from '../../components/ErrorAlert.tsx';
 import { StatusChip } from '../../components/StatusChip.tsx';
 import { t } from '../../lib/texts.ts';
@@ -77,6 +78,8 @@ export function BankQueuePage() {
           </Table>
         </TableContainer>
       )}
+
+      <PipelineStatsPanel />
     </Stack>
   );
 }

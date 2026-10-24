@@ -90,6 +90,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         documents.router,
         events.router,
         underwriting.router,
+        underwriting.stats_router,
     )
     for router in routers:
         app.include_router(router)

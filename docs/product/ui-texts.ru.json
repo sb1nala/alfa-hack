@@ -431,6 +431,24 @@
         "status": "Статус"
       }
     },
+    "stats": {
+      "title": "Конвейер сейчас",
+      "inProgress": "В работе",
+      "inProgressHint": "Отправлены, итога ещё нет",
+      "manualQueue": "Ждут аналитика",
+      "oldestWaiting": "Дольше всех ждёт {time}",
+      "queueEmpty": "Очередь пуста",
+      "automated": "Решено без аналитика",
+      "automatedHint": "{automated} из {decided} заявок с решением",
+      "decisionTime": "Время до решения",
+      "decisionTimeHint": "Медиана. 9 из 10 заявок — быстрее {p90}",
+      "issued": "Выдано кредитов",
+      "issuedHint": "На сумму {amount}",
+      "byStatus": "Заявки по этапам",
+      "byStatusHint": "Без черновиков",
+      "countForms": "заявка|заявки|заявок",
+      "noData": "Пока нет данных"
+    },
     "card": {
       "application": "Анкета",
       "checks": "Внешние проверки",
