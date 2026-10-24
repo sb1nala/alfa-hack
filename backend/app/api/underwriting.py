@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Query, Request
 
-from app import underwriting
+from app import stats, underwriting
 from app.api import examples as ex
 from app.api.applications import ApplicationID
 from app.api.contract import endpoint
@@ -11,11 +11,31 @@ from app.models import Application
 from app.schemas.common import ApplicationStatus, Page, PageQuery
 from app.schemas.underwriting import (
     ManualDecisionRequest,
+    PipelineStats,
     UnderwriterApplication,
     UnderwriterQueueItem,
 )
 
 router = APIRouter(prefix="/api/underwriter/applications", tags=["underwriting"])
+stats_router = APIRouter(prefix="/api/underwriter", tags=["underwriting"])
+
+
+@stats_router.get(
+    "/stats",
+    **endpoint(
+        PipelineStats,
+        {"stats": ex.PIPELINE_STATS},
+        "Сводка конвейера для кабинета аналитика: заявки по статусам (кроме DRAFT), "
+        "очередь ручной проверки и сколько ждёт самая старая заявка, доля решений без "
+        "аналитика, время от отправки до первого решения (медиана и 90-й перцентиль), "
+        "выданные кредиты и их сумма. Только агрегаты, без данных клиентов. "
+        "Доступ только underwriter.",
+        role="underwriter",
+        implemented=True,
+    ),
+)
+async def pipeline_stats(db: DBSession) -> PipelineStats:
+    return await stats.pipeline(db)
 
 
 @router.get(

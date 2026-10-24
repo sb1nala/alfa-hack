@@ -175,3 +175,31 @@ def examples(values: dict) -> dict:
 
 def page(item: dict) -> dict:
     return {"items": [item], "total": 1, "offset": 0, "limit": 20}
+
+
+PIPELINE_STATS = {
+    "generated_at": NOW,
+    "by_status": [
+        {"status": status, "count": count}
+        for status, count in (
+            ("SUBMITTED", 0),
+            ("CHECKING", 1),
+            ("SCORING", 0),
+            ("NEEDS_INFO", 2),
+            ("MANUAL_REVIEW", 3),
+            ("APPROVED", 4),
+            ("COUNTER_OFFER", 3),
+            ("REJECTED", 2),
+            ("OFFER_ACCEPTED", 1),
+            ("SIGNED", 0),
+            ("ISSUED", 6),
+            ("CANCELLED", 1),
+        )
+    ],
+    "in_progress": 14,
+    "manual_queue": {"count": 3, "oldest_waiting_seconds": 840},
+    "decided": 22,
+    "automated": 19,
+    "decision_time": {"median_seconds": 2.1, "p90_seconds": 11.4},
+    "issued": {"count": 6, "amount": "21500000.00"},
+}

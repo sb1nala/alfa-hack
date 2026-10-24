@@ -140,6 +140,7 @@ def test_contract_structure_and_examples_per_operation(path, method, operation):
             "/api/underwriter/applications/{application_id}/decision",
             "/api/applications/{application_id}/history",
             "/api/applications/{application_id}/events",
+            "/api/underwriter/stats",
         }
     )
     assert ("501" in operation["responses"]) == (not implemented)
@@ -174,7 +175,7 @@ def test_openapi_and_all_refs_are_valid():
     assert SCHEMA["openapi"].startswith("3.1.")
     ids = [op["operationId"] for _, _, op in OPERATIONS]
     assert len(set(ids)) == len(ids)
-    assert len(OPERATIONS) == 23
+    assert len(OPERATIONS) == 24
 
     def visit(node):
         if isinstance(node, dict):

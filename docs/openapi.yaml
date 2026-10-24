@@ -644,6 +644,26 @@ components:
           title: Term Months
       title: CreateDraftRequest
       type: object
+    DecisionTimeStats:
+      additionalProperties: false
+      properties:
+        median_seconds:
+          anyOf:
+          - minimum: 0.0
+            type: number
+          - type: 'null'
+          title: Median Seconds
+        p90_seconds:
+          anyOf:
+          - minimum: 0.0
+            type: number
+          - type: 'null'
+          title: P90 Seconds
+      required:
+      - median_seconds
+      - p90_seconds
+      title: DecisionTimeStats
+      type: object
     Document:
       additionalProperties: false
       properties:
@@ -880,6 +900,24 @@ components:
       - status
       title: HealthResponse
       type: object
+    IssuedStats:
+      additionalProperties: false
+      properties:
+        amount:
+          description: Сумма принятых предложений по выданным кредитам
+          maxLength: 30
+          pattern: ^(0|[1-9][0-9]*)\.[0-9]{2}$
+          title: Amount
+          type: string
+        count:
+          minimum: 0.0
+          title: Count
+          type: integer
+      required:
+      - count
+      - amount
+      title: IssuedStats
+      type: object
     LoginRequest:
       additionalProperties: false
       properties:
@@ -1019,6 +1057,25 @@ components:
       - outcome
       - required_documents
       title: ManualNeedsInfoRequest
+      type: object
+    ManualQueueStats:
+      additionalProperties: false
+      properties:
+        count:
+          minimum: 0.0
+          title: Count
+          type: integer
+        oldest_waiting_seconds:
+          anyOf:
+          - minimum: 0.0
+            type: integer
+          - type: 'null'
+          description: Сколько ждёт самая старая заявка в MANUAL_REVIEW; null, если очередь пуста
+          title: Oldest Waiting Seconds
+      required:
+      - count
+      - oldest_waiting_seconds
+      title: ManualQueueStats
       type: object
     ManualRejectionRequest:
       additionalProperties: false
@@ -1257,6 +1314,55 @@ components:
       - offset
       - limit
       title: Page[UnderwriterQueueItem]
+      type: object
+    PipelineStats:
+      additionalProperties: false
+      description: Сводка конвейера для кабинета аналитика; только агрегаты, без данных клиентов.
+      properties:
+        automated:
+          description: 'Из decided: первое решение принято системой без передачи аналитику'
+          minimum: 0.0
+          title: Automated
+          type: integer
+        by_status:
+          description: Все статусы, кроме DRAFT, в порядке конвейера; нулевые тоже
+          items:
+            $ref: '#/components/schemas/StatusCount'
+          title: By Status
+          type: array
+        decided:
+          description: Заявки, по которым есть хотя бы одно решение
+          minimum: 0.0
+          title: Decided
+          type: integer
+        decision_time:
+          $ref: '#/components/schemas/DecisionTimeStats'
+          description: От первой отправки до первого решения системы, по заявкам с решением
+        generated_at:
+          description: ISO 8601 in UTC
+          format: date-time
+          pattern: .*(Z|\+00:00)$
+          title: Generated At
+          type: string
+        in_progress:
+          description: Отправленные заявки, по которым ещё нет итога
+          minimum: 0.0
+          title: In Progress
+          type: integer
+        issued:
+          $ref: '#/components/schemas/IssuedStats'
+        manual_queue:
+          $ref: '#/components/schemas/ManualQueueStats'
+      required:
+      - generated_at
+      - by_status
+      - in_progress
+      - manual_queue
+      - decided
+      - automated
+      - decision_time
+      - issued
+      title: PipelineStats
       type: object
     Product:
       additionalProperties: false
@@ -1509,6 +1615,20 @@ components:
       - status
       - occurred_at
       title: StatusChangedData
+      type: object
+    StatusCount:
+      additionalProperties: false
+      properties:
+        count:
+          minimum: 0.0
+          title: Count
+          type: integer
+        status:
+          $ref: '#/components/schemas/ApplicationStatus'
+      required:
+      - status
+      - count
+      title: StatusCount
       type: object
     SubmitRequest:
       additionalProperties: false
@@ -7584,6 +7704,238 @@ paths:
       - CSRFToken: []
         SessionCookie: []
       summary: Manual Decision
+      tags:
+      - underwriting
+      x-required-roles:
+      - underwriter
+  /api/underwriter/stats:
+    get:
+      description: 'Сводка конвейера для кабинета аналитика: заявки по статусам (кроме DRAFT), очередь
+        ручной проверки и сколько ждёт самая старая заявка, доля решений без аналитика, время от отправки
+        до первого решения (медиана и 90-й перцентиль), выданные кредиты и их сумма. Только агрегаты,
+        без данных клиентов. Доступ только underwriter.'
+      operationId: pipeline_stats_api_underwriter_stats_get
+      responses:
+        '200':
+          content:
+            application/json:
+              examples:
+                stats:
+                  summary: 'Синтетический пример: stats'
+                  value:
+                    automated: 19
+                    by_status:
+                    - count: 0
+                      status: SUBMITTED
+                    - count: 1
+                      status: CHECKING
+                    - count: 0
+                      status: SCORING
+                    - count: 2
+                      status: NEEDS_INFO
+                    - count: 3
+                      status: MANUAL_REVIEW
+                    - count: 4
+                      status: APPROVED
+                    - count: 3
+                      status: COUNTER_OFFER
+                    - count: 2
+                      status: REJECTED
+                    - count: 1
+                      status: OFFER_ACCEPTED
+                    - count: 0
+                      status: SIGNED
+                    - count: 6
+                      status: ISSUED
+                    - count: 1
+                      status: CANCELLED
+                    decided: 22
+                    decision_time:
+                      median_seconds: 2.1
+                      p90_seconds: 11.4
+                    generated_at: '2026-10-20T18:00:00Z'
+                    in_progress: 14
+                    issued:
+                      amount: '21500000.00'
+                      count: 6
+                    manual_queue:
+                      count: 3
+                      oldest_waiting_seconds: 840
+              schema:
+                $ref: '#/components/schemas/PipelineStats'
+          description: Успешный ответ
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
+        '400':
+          content:
+            application/json:
+              examples:
+                error:
+                  summary: 'Синтетический пример: error'
+                  value:
+                    code: BAD_REQUEST
+                    field_errors: []
+                    message: Некорректный запрос
+                    request_id: 80000000-0000-4000-8000-000000000001
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Некорректный запрос
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
+            X-Request-ID:
+              schema:
+                format: uuid
+                type: string
+        '401':
+          content:
+            application/json:
+              examples:
+                error:
+                  summary: 'Синтетический пример: error'
+                  value:
+                    code: UNAUTHENTICATED
+                    field_errors: []
+                    message: Требуется вход
+                    request_id: 80000000-0000-4000-8000-000000000001
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Требуется вход
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
+            X-Request-ID:
+              schema:
+                format: uuid
+                type: string
+        '403':
+          content:
+            application/json:
+              examples:
+                error:
+                  summary: 'Синтетический пример: error'
+                  value:
+                    code: FORBIDDEN
+                    field_errors: []
+                    message: Недостаточно прав или неверный CSRF-токен
+                    request_id: 80000000-0000-4000-8000-000000000001
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Недостаточно прав или неверный CSRF-токен
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
+            X-Request-ID:
+              schema:
+                format: uuid
+                type: string
+        '404':
+          content:
+            application/json:
+              examples:
+                error:
+                  summary: 'Синтетический пример: error'
+                  value:
+                    code: NOT_FOUND
+                    field_errors: []
+                    message: Ресурс не найден или недоступен этому владельцу
+                    request_id: 80000000-0000-4000-8000-000000000001
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Ресурс не найден или недоступен этому владельцу
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
+            X-Request-ID:
+              schema:
+                format: uuid
+                type: string
+        '422':
+          content:
+            application/json:
+              examples:
+                error:
+                  summary: 'Синтетический пример: error'
+                  value:
+                    code: VALIDATION_ERROR
+                    field_errors:
+                    - code: greater_than_equal
+                      field: body.term_months
+                      message: Некорректное значение
+                    message: Некорректные параметры запроса
+                    request_id: 80000000-0000-4000-8000-000000000001
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Некорректные параметры запроса
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
+            X-Request-ID:
+              schema:
+                format: uuid
+                type: string
+        '429':
+          content:
+            application/json:
+              examples:
+                error:
+                  summary: 'Синтетический пример: error'
+                  value:
+                    code: RATE_LIMITED
+                    field_errors: []
+                    message: Слишком много запросов
+                    request_id: 80000000-0000-4000-8000-000000000001
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Слишком много запросов
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
+            X-Request-ID:
+              schema:
+                format: uuid
+                type: string
+        '500':
+          content:
+            application/json:
+              examples:
+                error:
+                  summary: 'Синтетический пример: error'
+                  value:
+                    code: INTERNAL_ERROR
+                    field_errors: []
+                    message: Внутренняя ошибка
+                    request_id: 80000000-0000-4000-8000-000000000001
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Внутренняя ошибка
+          headers:
+            Cache-Control:
+              schema:
+                const: no-store
+                type: string
+            X-Request-ID:
+              schema:
+                format: uuid
+                type: string
+      security:
+      - SessionCookie: []
+      summary: Pipeline Stats
       tags:
       - underwriting
       x-required-roles:

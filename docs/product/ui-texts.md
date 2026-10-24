@@ -269,6 +269,22 @@
 | `bank.queue.columns.riskClass` | Класс риска |
 | `bank.queue.columns.receivedAt` | Поступила |
 | `bank.queue.columns.status` | Статус |
+| `bank.stats.title` | Конвейер сейчас |
+| `bank.stats.inProgress` | В работе |
+| `bank.stats.inProgressHint` | Отправлены, итога ещё нет |
+| `bank.stats.manualQueue` | Ждут аналитика |
+| `bank.stats.oldestWaiting` | Дольше всех ждёт {time} |
+| `bank.stats.queueEmpty` | Очередь пуста |
+| `bank.stats.automated` | Решено без аналитика |
+| `bank.stats.automatedHint` | {automated} из {decided} заявок с решением |
+| `bank.stats.decisionTime` | Время до решения |
+| `bank.stats.decisionTimeHint` | Медиана. 9 из 10 заявок — быстрее {p90} |
+| `bank.stats.issued` | Выдано кредитов |
+| `bank.stats.issuedHint` | На сумму {amount} |
+| `bank.stats.byStatus` | Заявки по этапам |
+| `bank.stats.byStatusHint` | Без черновиков |
+| `bank.stats.countForms` | заявка\|заявки\|заявок |
+| `bank.stats.noData` | Пока нет данных |
 | `bank.card.application` | Анкета |
 | `bank.card.checks` | Внешние проверки |
 | `bank.card.checkBki` | БКИ — кредитная история |
