@@ -1,0 +1,261 @@
+{
+  "note": "Synthetic OpenAPI examples from docs/openapi.yaml; browser fixture, not backend acceptance.",
+  "user": {
+    "display_name": "Демо-клиент",
+    "id": "20000000-0000-4000-8000-000000000001",
+    "login": "demo-client",
+    "role": "client"
+  },
+  "products": {
+    "items": [
+      {
+        "code": "demo-product",
+        "description": "Синтетический пример без кредитной политики и ставок",
+        "id": "30000000-0000-4000-8000-000000000001",
+        "name": "Демонстрационный продукт",
+        "purposes": [
+          "Развитие бизнеса"
+        ]
+      }
+    ]
+  },
+  "approved": {
+    "accepted_offer_id": null,
+    "allowed_actions": [
+      "accept_offer",
+      "cancel"
+    ],
+    "amount": "100000.00",
+    "company_name": "ООО «Синтетический пример»",
+    "created_at": "2026-10-20T18:00:00Z",
+    "decision": {
+      "created_at": "2026-10-20T18:00:00Z",
+      "explanation": "Синтетическое объяснение результата обработки",
+      "id": "50000000-0000-4000-8000-000000000001",
+      "offer": {
+        "created_at": "2026-10-20T18:00:00Z",
+        "expires_at": null,
+        "id": "40000000-0000-4000-8000-000000000001",
+        "terms": {
+          "amount": "100000.00",
+          "annual_rate_percent": null,
+          "product_id": "30000000-0000-4000-8000-000000000001",
+          "term_months": 12
+        }
+      },
+      "outcome": "APPROVED",
+      "reasons": [
+        {
+          "code": "DEMO_REASON",
+          "message": "Синтетическая причина, не кредитное правило"
+        }
+      ],
+      "required_documents": []
+    },
+    "form": {
+      "amount": "100000.00",
+      "annual_revenue": "1000000.00",
+      "company": {
+        "inn": "7701234560",
+        "legal_form": "OOO",
+        "name": "ООО «Синтетический пример»"
+      },
+      "product_id": "30000000-0000-4000-8000-000000000001",
+      "purpose": "Развитие бизнеса",
+      "term_months": 12
+    },
+    "id": "10000000-0000-4000-8000-000000000001",
+    "owner_id": "20000000-0000-4000-8000-000000000001",
+    "product_id": "30000000-0000-4000-8000-000000000001",
+    "revision": 5,
+    "status": "APPROVED",
+    "term_months": 12,
+    "updated_at": "2026-10-20T18:00:00Z"
+  },
+  "needsInfo": {
+    "accepted_offer_id": null,
+    "allowed_actions": [
+      "provide_info",
+      "upload_document",
+      "cancel"
+    ],
+    "amount": "100000.00",
+    "company_name": "ООО «Синтетический пример»",
+    "created_at": "2026-10-20T18:00:00Z",
+    "decision": {
+      "created_at": "2026-10-20T18:00:00Z",
+      "explanation": "Синтетическое объяснение результата обработки",
+      "id": "50000000-0000-4000-8000-000000000001",
+      "outcome": "NEEDS_INFO",
+      "reasons": [
+        {
+          "code": "DEMO_REASON",
+          "message": "Синтетическая причина, не кредитное правило"
+        }
+      ],
+      "required_documents": [
+        {
+          "code": "DEMO_DOCUMENT",
+          "explanation": "Пример запроса сведений; состав согласуется с рисками",
+          "title": "Демонстрационный документ"
+        }
+      ]
+    },
+    "form": {
+      "amount": "100000.00",
+      "annual_revenue": "1000000.00",
+      "company": {
+        "inn": "7701234560",
+        "legal_form": "OOO",
+        "name": "ООО «Синтетический пример»"
+      },
+      "product_id": "30000000-0000-4000-8000-000000000001",
+      "purpose": "Развитие бизнеса",
+      "term_months": 12
+    },
+    "id": "10000000-0000-4000-8000-000000000001",
+    "owner_id": "20000000-0000-4000-8000-000000000001",
+    "product_id": "30000000-0000-4000-8000-000000000001",
+    "revision": 5,
+    "status": "NEEDS_INFO",
+    "term_months": 12,
+    "updated_at": "2026-10-20T18:00:00Z"
+  },
+  "bank": {
+    "allowed_actions": [
+      "decide"
+    ],
+    "application": {
+      "accepted_offer_id": null,
+      "allowed_actions": [
+        "cancel"
+      ],
+      "amount": "100000.00",
+      "company_name": "ООО «Синтетический пример»",
+      "created_at": "2026-10-20T18:00:00Z",
+      "decision": {
+        "created_at": "2026-10-20T18:00:00Z",
+        "explanation": "Синтетическое объяснение результата обработки",
+        "id": "50000000-0000-4000-8000-000000000001",
+        "outcome": "MANUAL_REVIEW",
+        "reasons": [
+          {
+            "code": "DEMO_REASON",
+            "message": "Синтетическая причина, не кредитное правило"
+          }
+        ],
+        "required_documents": []
+      },
+      "form": {
+        "amount": "100000.00",
+        "annual_revenue": "1000000.00",
+        "company": {
+          "inn": "7701234560",
+          "legal_form": "OOO",
+          "name": "ООО «Синтетический пример»"
+        },
+        "product_id": "30000000-0000-4000-8000-000000000001",
+        "purpose": "Развитие бизнеса",
+        "term_months": 12
+      },
+      "id": "10000000-0000-4000-8000-000000000001",
+      "owner_id": "20000000-0000-4000-8000-000000000001",
+      "product_id": "30000000-0000-4000-8000-000000000001",
+      "revision": 5,
+      "status": "MANUAL_REVIEW",
+      "term_months": 12,
+      "updated_at": "2026-10-20T18:00:00Z"
+    },
+    "decisions": [
+      {
+        "analytical_explanation": "Демонстрационное внутреннее объяснение, шкала не определена",
+        "author_id": null,
+        "policy_version": null,
+        "public": {
+          "created_at": "2026-10-20T18:00:00Z",
+          "explanation": "Синтетическое объяснение результата обработки",
+          "id": "50000000-0000-4000-8000-000000000001",
+          "outcome": "MANUAL_REVIEW",
+          "reasons": [
+            {
+              "code": "DEMO_REASON",
+              "message": "Синтетическая причина, не кредитное правило"
+            }
+          ],
+          "required_documents": []
+        },
+        "review_reason": "gray_zone",
+        "scoring_factors": [],
+        "source": "automatic"
+      }
+    ]
+  },
+  "stats": {
+    "automated": 19,
+    "by_status": [
+      {
+        "count": 0,
+        "status": "SUBMITTED"
+      },
+      {
+        "count": 1,
+        "status": "CHECKING"
+      },
+      {
+        "count": 0,
+        "status": "SCORING"
+      },
+      {
+        "count": 2,
+        "status": "NEEDS_INFO"
+      },
+      {
+        "count": 3,
+        "status": "MANUAL_REVIEW"
+      },
+      {
+        "count": 4,
+        "status": "APPROVED"
+      },
+      {
+        "count": 3,
+        "status": "COUNTER_OFFER"
+      },
+      {
+        "count": 2,
+        "status": "REJECTED"
+      },
+      {
+        "count": 1,
+        "status": "OFFER_ACCEPTED"
+      },
+      {
+        "count": 0,
+        "status": "SIGNED"
+      },
+      {
+        "count": 6,
+        "status": "ISSUED"
+      },
+      {
+        "count": 1,
+        "status": "CANCELLED"
+      }
+    ],
+    "decided": 22,
+    "decision_time": {
+      "median_seconds": 2.1,
+      "p90_seconds": 11.4
+    },
+    "generated_at": "2026-10-20T18:00:00Z",
+    "in_progress": 14,
+    "issued": {
+      "amount": "21500000.00",
+      "count": 6
+    },
+    "manual_queue": {
+      "count": 3,
+      "oldest_waiting_seconds": 840
+    }
+  }
+}
