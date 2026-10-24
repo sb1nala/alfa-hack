@@ -1,4 +1,4 @@
-import { Step, StepLabel, Stepper, Typography } from '@mui/material';
+import { Step, StepLabel, Stepper, Typography, useMediaQuery, useTheme } from '@mui/material';
 import { buildTimeline } from '../lib/timeline.ts';
 import { statusTexts, type ApplicationStatus } from '../lib/texts.ts';
 
@@ -9,10 +9,13 @@ import { statusTexts, type ApplicationStatus } from '../lib/texts.ts';
 export function ApplicationTimeline({ status }: { status: ApplicationStatus }) {
   const steps = buildTimeline(status, statusTexts(status).timeline);
   const active = steps.findIndex((s) => s.state !== 'done');
+  // Six steps in a row do not fit a phone: there the timeline runs top to bottom.
+  const narrow = useMediaQuery(useTheme().breakpoints.down('sm'));
   return (
     <Stepper
       activeStep={active === -1 ? steps.length : active}
-      alternativeLabel
+      alternativeLabel={!narrow}
+      orientation={narrow ? 'vertical' : 'horizontal'}
       aria-label="Этапы рассмотрения заявки"
       sx={{
         overflowX: 'auto',

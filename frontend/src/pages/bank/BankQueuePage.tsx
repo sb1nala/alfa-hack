@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   CircularProgress, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  ToggleButton, ToggleButtonGroup, Typography,
+  ToggleButton, ToggleButtonGroup, Typography, useMediaQuery, useTheme,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useUnderwriterQueue } from '../../api/bank.ts';
@@ -21,6 +21,8 @@ export function BankQueuePage() {
   const [filter, setFilter] = useState<'MANUAL_REVIEW' | 'all'>('MANUAL_REVIEW');
   const queue = useUnderwriterQueue(filter);
   const navigate = useNavigate();
+  // On a phone the date moves under the company name: three columns do not fit 375 px.
+  const narrow = useMediaQuery(useTheme().breakpoints.down('sm'));
 
   return (
     <Stack spacing={3}>
@@ -51,12 +53,12 @@ export function BankQueuePage() {
 
       {queue.data && queue.data.items.length > 0 && (
         <TableContainer component={Paper} variant="outlined">
-          <Table aria-label={t.bank.queue.title}>
+          <Table aria-label={t.bank.queue.title} size={narrow ? 'small' : 'medium'}>
             <TableHead>
               <TableRow>
                 <TableCell>{t.bank.queue.columns.company}</TableCell>
                 <TableCell>{t.bank.queue.columns.status}</TableCell>
-                <TableCell>{t.bank.queue.columns.receivedAt}</TableCell>
+                {!narrow && <TableCell>{t.bank.queue.columns.receivedAt}</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -69,9 +71,16 @@ export function BankQueuePage() {
                   onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/bank/applications/${item.id}`); }}
                   sx={{ cursor: 'pointer' }}
                 >
-                  <TableCell sx={{ fontWeight: 500 }}>{item.company_name ?? '—'}</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>
+                    {item.company_name ?? '—'}
+                    {narrow && (
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 400 }}>
+                        {t.bank.queue.columns.receivedAt}: {dateTime(item.updated_at)}
+                      </Typography>
+                    )}
+                  </TableCell>
                   <TableCell><StatusChip status={item.status} bank /></TableCell>
-                  <TableCell>{dateTime(item.updated_at)}</TableCell>
+                  {!narrow && <TableCell>{dateTime(item.updated_at)}</TableCell>}
                 </TableRow>
               ))}
             </TableBody>
