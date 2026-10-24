@@ -2,6 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, Path, Request, Response, UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from app import documents
 from app.api import examples as ex
@@ -128,7 +129,13 @@ async def download_document(
     request: Request,
 ) -> Response:
     return Response(
-        documents.read_file(request.app.state.settings, document),
+        await run_in_threadpool(
+            documents.read_file,
+            request.app.state.settings,
+            document.storage_key,
+            document.size_bytes,
+            document.sha256,
+        ),
         media_type=document.media_type,
         headers={
             "Content-Disposition": documents.content_disposition(document.filename),

@@ -1,9 +1,14 @@
 """B11 accept-offer, sign + issuance, additional info and documents on PostgreSQL 16."""
 
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 from uuid import UUID, uuid4
 
+import anyio
+import httpx
 import pytest
+from fastapi import Request
 from sqlalchemy import select
 from test_auth_postgres import csrf, headers, in_database
 from test_decision_worker_postgres import company_key as company_key
@@ -15,6 +20,8 @@ from test_drafts_postgres import draft_settings as draft_settings
 from test_submissions_postgres import cancel, complete, path, submit
 from test_worker_postgres import rig as rig
 
+from app import documents
+from app.dependencies import database_session
 from app.models import (
     Application,
     ApplicationEvent,
@@ -403,6 +410,10 @@ def test_upload_validation_listing_download_and_access(actors, storage):
     assert blob.read_bytes() == PNG
     blob.write_bytes(b"\x89PNG tampered")
     assert actors.first.get(url).status_code == 404
+    blob.write_bytes(bytes([PNG[0] ^ 1]) + PNG[1:])  # Same size, wrong sha256.
+    assert actors.first.get(url).status_code == 404
+    blob.unlink()
+    assert actors.first.get(url).status_code == 404
 
     # Documents uploaded in DRAFT become part of the first input version.
     current = card(actors, application)
@@ -417,6 +428,140 @@ def test_upload_validation_listing_download_and_access(actors, storage):
 
     assert in_database(actors.settings, frozen) == ["bank_statement_12m", "lease_agreement"]
     assert upload(actors, application).status_code == 409
+
+
+@pytest.mark.parametrize("operation", ["upload", "download"])
+def test_document_io_does_not_block_other_request(actors, monkeypatch, operation):
+    application = complete(actors)
+    url = path(application) + "/documents"
+    if operation == "download":
+        document = upload(actors, application).json()
+        url += f"/{document['id']}/download"
+    original = getattr(documents, "write_file" if operation == "upload" else "read_file")
+    entered, release = Event(), Event()
+
+    def delayed(*args):
+        entered.set()
+        assert release.wait(15), "file barrier was not released"
+        return original(*args)
+
+    monkeypatch.setattr(documents, original.__name__, delayed)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        pending = (
+            pool.submit(upload, actors, application, revision=application["revision"])
+            if operation == "upload"
+            else pool.submit(actors.first.get, url)
+        )
+        try:
+            assert entered.wait(5), "file operation did not start"
+            # The same TestClient uses one lifespan/portal and thus the same API loop.
+            # An external future deadline lets finally release even a blocked loop.
+            neighbor = pool.submit(actors.first.get, "/api/auth/me")
+            response = neighbor.result(timeout=5)
+            assert response.status_code == 200
+            assert not pending.done() and not release.is_set()
+        finally:
+            release.set()
+        response = pending.result(timeout=5)
+    assert response.status_code == (201 if operation == "upload" else 200)
+    if operation == "download":
+        assert response.content == PDF
+    else:
+        url += f"/{response.json()['id']}/download"
+        assert actors.first.get(url).content == PDF
+
+
+def test_file_write_failure_rolls_back_metadata_revision_and_event(actors, monkeypatch):
+    application = complete(actors)
+
+    async def snapshot(db):
+        app_id = UUID(application["id"])
+        app = await db.get(Application, app_id)
+        docs = list(await db.scalars(select(Document.id).where(Document.application_id == app_id)))
+        events = list(
+            await db.scalars(
+                select(ApplicationEvent.id)
+                .where(ApplicationEvent.application_id == app_id)
+                .order_by(ApplicationEvent.sequence)
+            )
+        )
+        return app.revision, app.updated_at, docs, events
+
+    before = in_database(actors.settings, snapshot)
+
+    def fail(*args):
+        raise OSError("synthetic disk failure")
+
+    monkeypatch.setattr(documents, "write_file", fail)
+    # TestClient normally re-raises server exceptions after sending the 500 response.
+    monkeypatch.setattr(actors.first._transport, "raise_server_exceptions", False)
+    response = upload(actors, application, revision=application["revision"])
+    assert response.status_code == 500
+    assert in_database(actors.settings, snapshot) == before
+
+
+@pytest.mark.parametrize("operation", ["upload", "download"])
+def test_cancelled_document_request_waits_for_file_worker(actors, monkeypatch, operation):
+    application = complete(actors)
+    url = path(application) + "/documents"
+    if operation == "download":
+        document = upload(actors, application).json()
+        url += f"/{document['id']}/download"
+    original = getattr(documents, "write_file" if operation == "upload" else "read_file")
+    entered, release, closed, responded = Event(), Event(), Event(), Event()
+    app = actors.first.app
+
+    def delayed(*args):
+        entered.set()
+        assert release.wait(15), "file barrier was not released"
+        assert not closed.is_set()
+        return original(*args)
+
+    async def tracked_session(request: Request):
+        try:
+            async with request.app.state.session_factory() as session:
+                yield session
+        finally:
+            closed.set()
+
+    async def request(*, task_status):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url=str(actors.first.base_url),
+            cookies=actors.first.cookies,
+        ) as client:
+            with anyio.CancelScope() as scope:
+                task_status.started(scope)
+                if operation == "upload":
+                    await client.post(
+                        url,
+                        files={"file": ("statement.pdf", PDF, "application/pdf")},
+                        data={
+                            "document_type": "bank_statement_12m",
+                            "expected_revision": str(application["revision"]),
+                        },
+                        headers=actors.h,
+                    )
+                else:
+                    await client.get(url)
+                responded.set()
+
+    monkeypatch.setattr(documents, original.__name__, delayed)
+    app.dependency_overrides[database_session] = tracked_session
+    pending, scope = actors.first.portal.start_task(request)
+    try:
+        assert entered.wait(5)
+        actors.first.portal.call(scope.cancel)
+        # A round trip on the API loop also gives cancellation a chance to run.
+        assert actors.first.get("/health/live").status_code == 200
+        assert not closed.is_set() and not pending.done() and not responded.is_set()
+    finally:
+        release.set()
+        try:
+            pending.result(timeout=5)
+        finally:
+            app.dependency_overrides.pop(database_session)
+    assert closed.is_set() and not responded.is_set()
 
 
 def test_actions_require_matching_status(actors):
