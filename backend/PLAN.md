@@ -529,3 +529,20 @@ risk_class, requested_dscr/offer_dscr, data_gaps, стоп-факторы, revie
   `git diff --check` — PASS. Это исторические локальные проверки PR #89.
   Текущий main `1c93ac7` отдельно подтверждён обоими CI jobs (576 backend-тестов);
   [итоговая техническая приёмка](ACCEPTANCE-REPORT.md). Отображение причины — frontend.
+
+## Исправление файлового I/O документов — 24.10.2026, на ревью
+
+- [PR #104](https://github.com/sb1nala/alfa-hack/pull/104): запись и чтение с проверкой
+  size/SHA-256 ожидаются через Starlette `run_in_threadpool`; в поток не передаются
+  ORM/DBSession. Запись остаётся до commit, контракт и проверки доступа сохранены.
+- PostgreSQL 16.15: **79 passed** (client actions, auth/access, documents migrations).
+  Для upload/download соседний `/api/auth/me` завершается на том же API event loop,
+  пока файловый барьер удерживается. Оба теста ожидаемо падают на исходном `79d1f3f`;
+  внешние deadlines и освобождение в finally ограничивают ожидание.
+- Проверены точные байты, откат Document/revision/аудита при ошибке записи, 404 для
+  отсутствующего файла и повреждения размера/SHA-256, доступ и отмена AnyIO scope
+  без завершения запроса/закрытия сессии до конца файловой операции.
+  Ruff, format backend/scripts вне `app/decision`, OpenAPI `--check`, diff check — PASS.
+- Отмена не останавливает системный файловый вызов; worker не обращается к БД.
+  Прежние транзакционные блокировки и допущение об осиротевшем файле при сбое commit
+  сохраняются. Результаты двух обязательных CI jobs доступны в PR; слияние отдельно.
