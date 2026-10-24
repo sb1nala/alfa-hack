@@ -31,7 +31,8 @@ module.exports = async function checkUI(browser, cfg) {
     await page.getByRole("button", { name: texts.login.submit, exact: true }).click();
     await page.getByRole("link", { name: texts.applications.newApplication, exact: true }).click();
     await page.getByRole("radio", { name: /Закупить товар или сырьё/ }).click();
-    await page.getByRole("button", { name: texts.productPicker.choose, exact: true }).first().click();
+    // Product buttons are named "Выбрать: <продукт>"; the first one is the recommended product.
+    await page.getByRole("button", { name: new RegExp(`^${texts.productPicker.choose}: `) }).first().click();
     await page.getByLabel(texts.form.inn.label, { exact: true }).fill(cfg.record.company.inn);
     await page.getByText(texts.form.autofillNote, { exact: true }).waitFor();
     // UI fields accept whole rubles; seed/API money strings include .00.
