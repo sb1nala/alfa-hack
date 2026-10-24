@@ -42,10 +42,14 @@ module.exports = async function checkUI(browser, cfg) {
     await page.getByRole("button", { name: texts.decision.approved.accept, exact: true }).waitFor({ timeout: 30000 });
     await page.getByRole("button", { name: texts.decision.approved.accept, exact: true }).click();
     await page.getByRole("checkbox", { name: texts.signing.confirmCheckbox, exact: true }).check();
+    await page.getByRole("button", { name: texts.signing.getCode, exact: true }).click();
+    // The simulated confirmation code is shown on screen as "482 913".
+    const code = (await page.getByText(/^\d{3} \d{3}$/).textContent()).replace(/\D/g, "");
+    await page.getByLabel(texts.signing.codeLabel, { exact: true }).fill(code);
     await page.getByRole("button", { name: texts.signing.sign, exact: true }).click();
     await page.getByRole("heading", { name: texts.statuses.ISSUED.title, exact: true }).waitFor({ timeout: 30000 });
     if (documents !== 1) throw Error("UI flow unexpectedly reloaded a document");
-    console.log("PASS working SPA: login, picker, INN, submit, decision, accept, sign, ISSUED without reload");
+    console.log("PASS working SPA: login, picker, INN, submit, decision, accept, sign with code, ISSUED without reload");
     console.log(`UI transport observed: ${streams} EventSource requests, ${reads} card GETs; ` +
       (streams ? "SSE requests observed; resilience acceptance remains separate" : "polling; frontend SSE acceptance remains BLOCKED"));
     if (process.env.REQUIRE_UI_SSE === "1" && (streams === 0 || openStreams === 0))
