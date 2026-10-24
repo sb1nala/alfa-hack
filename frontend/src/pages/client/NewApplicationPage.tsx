@@ -61,6 +61,7 @@ export function NewApplicationPage() {
                 <CardActionArea
                   role="radio"
                   aria-checked={selected}
+                  aria-label={purposeTexts(code)?.label ?? code}
                   onClick={() => setPurpose(code)}
                   sx={{ p: 2.5, height: '100%' }}
                 >
@@ -104,6 +105,7 @@ export function NewApplicationPage() {
                       size="large"
                       disabled={create.isPending}
                       onClick={() => create.mutate(product)}
+                      aria-label={`${t.productPicker.choose}: ${text?.name ?? product.name}`}
                     >
                       {t.productPicker.choose}
                     </Button>
