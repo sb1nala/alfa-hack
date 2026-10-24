@@ -11,6 +11,7 @@ from fastapi import HTTPException, UploadFile
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from app.config import Settings
 from app.decision.texts import REQUIRED_DOCUMENTS
@@ -92,15 +93,12 @@ def write_file(settings: Settings, key: str, content: bytes) -> None:
     os.replace(partial, target)
 
 
-def read_file(settings: Settings, document: Document) -> bytes:
+def read_file(settings: Settings, storage_key: str, size_bytes: int, sha256: str) -> bytes:
     try:
-        content = storage_path(settings, document.storage_key).read_bytes()
+        content = storage_path(settings, storage_key).read_bytes()
     except (OSError, ValueError):
         raise HTTPException(404) from None
-    if (
-        len(content) != document.size_bytes
-        or hashlib.sha256(content).hexdigest() != document.sha256
-    ):
+    if len(content) != size_bytes or hashlib.sha256(content).hexdigest() != sha256:
         raise HTTPException(404)
     return content
 
@@ -160,7 +158,9 @@ async def upload(
     await db.flush()
     # The file lands before commit: a failed commit leaves an unreferenced blob, never a
     # row without content. Blobs are content-addressed only by their random key.
-    write_file(settings, key, content)
+    # Starlette uses AnyIO's non-abandoning worker: scope cancellation waits for I/O.
+    # Only plain file inputs enter the worker; the session stays on the event loop.
+    await run_in_threadpool(write_file, settings, key, content)
     return public(document)
 
 
