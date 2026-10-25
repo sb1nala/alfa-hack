@@ -323,7 +323,7 @@ def main():
                 ["node", str(ROOT / "scripts/check_sse_browser.cjs"), str(cfg)],
                 env=env,
                 check=True,
-                timeout=180,
+                timeout=360,
             )
         print("PASS Compose/API/persistence/test EventSource/UI smoke; UI SSE acceptance separate")
     except BaseException:

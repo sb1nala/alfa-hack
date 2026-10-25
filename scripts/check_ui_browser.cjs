@@ -58,6 +58,7 @@ module.exports = async function checkUI(browser, cfg) {
   } finally {
     await context.close();
   }
+  await require("../frontend/scripts/check-docker-recovery.cjs")(browser, cfg);
 };
 
 if (require.main === module) {
