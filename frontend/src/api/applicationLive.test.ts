@@ -18,6 +18,34 @@ class FakeSource extends EventTarget {
 }
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
 
+test('browser offline is visible even if native SSE remains OPEN; online restores snapshot and history', async () => {
+  const network = new EventTarget();
+  const source = new FakeSource();
+  const states: boolean[] = [];
+  const reads: boolean[] = [];
+  let sources = 0;
+  const stop = watchApplication({ id: 'app', network,
+    createSource: () => { sources++; return source; },
+    refresh: async (_signal, history) => { reads.push(history); },
+    onConnection: (lost) => states.push(lost), onFatal: () => {},
+  });
+  try {
+    source.open(); await tick();
+    network.dispatchEvent(new Event('offline'));
+    assert.equal(source.readyState, 1);
+    assert.equal(states.at(-1), true);
+    source.change('status_changed', 'missed'); source.open(); await tick();
+    assert.equal(reads.length, 1, 'No refresh or false recovery while browser is offline');
+    assert.equal(states.at(-1), true);
+    network.dispatchEvent(new Event('online')); await tick();
+    assert.deepEqual(reads, [true, true]);
+    assert.equal(states.at(-1), false);
+    assert.equal(sources, 1, 'Reuse the native source without parallel connections');
+  } finally { stop(); }
+  network.dispatchEvent(new Event('offline')); network.dispatchEvent(new Event('online')); await tick();
+  assert.equal(reads.length, 2, 'Stop removes network listeners');
+});
+
 test('open and all named events reread the snapshot; duplicate, foreign and invalid events are ignored', async () => {
   const source = new FakeSource();
   let reads = 0;

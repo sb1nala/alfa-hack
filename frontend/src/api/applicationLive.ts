@@ -16,6 +16,7 @@ export function watchApplication(options: {
   onConnection: (lost: boolean) => void;
   onFatal: (error: ApiError) => void;
   createSource?: (url: string) => Source;
+  network?: Pick<EventTarget, 'addEventListener' | 'removeEventListener'>;
   retryMs?: number;
 }) {
   const lifetime = new AbortController();
@@ -26,6 +27,8 @@ export function watchApplication(options: {
   let pending = false;
   let pendingHistory = false;
   let lost = false;
+  let offline = false;
+  const network = options.network ?? (typeof window === 'undefined' ? undefined : window);
   const seen = new Set<string>();
   const retryMs = options.retryMs ?? 3_000;
 
@@ -35,6 +38,8 @@ export function watchApplication(options: {
     lifetime.abort();
     clearTimeout(timer);
     detach();
+    network?.removeEventListener('offline', networkLost);
+    network?.removeEventListener('online', networkRestored);
     activeStreams.delete(stop);
   }
 
@@ -47,17 +52,17 @@ export function watchApplication(options: {
   }
 
   function schedule() {
-    if (stopped || timer !== undefined) return;
+    if (stopped || offline || timer !== undefined) return;
     timer = setTimeout(() => { timer = undefined; void refresh(true); }, retryMs);
   }
 
   async function refresh(restoreHistory = false) {
-    if (stopped) return;
+    if (stopped || offline) return;
     if (running) { pending = true; pendingHistory ||= restoreHistory; return; }
     running = true;
     try {
       await options.refresh(AbortSignal.any([lifetime.signal, AbortSignal.timeout(10_000)]), restoreHistory);
-      if (stopped) return;
+      if (stopped || offline) return;
       if (source?.readyState === 1) {
         lost = false;
         clearTimeout(timer);
@@ -90,7 +95,7 @@ export function watchApplication(options: {
   }
 
   function opened() {
-    if (stopped) return;
+    if (stopped || offline) return;
     lost = false;
     clearTimeout(timer);
     timer = undefined;
@@ -106,8 +111,24 @@ export function watchApplication(options: {
     void refresh(true);
   }
 
+  function networkLost() {
+    if (stopped) return;
+    offline = true;
+    lost = true;
+    clearTimeout(timer);
+    timer = undefined;
+    options.onConnection(true);
+  }
+
+  function networkRestored() {
+    if (stopped) return;
+    offline = false;
+    // An existing EventSource may still be OPEN and never emit another open event.
+    void refresh(true);
+  }
+
   function changed(event: Event) {
-    if (stopped || !(event instanceof MessageEvent)) return;
+    if (stopped || offline || !(event instanceof MessageEvent)) return;
     try {
       const data: unknown = JSON.parse(String(event.data));
       if (!data || typeof data !== 'object' || !('application_id' in data) ||
@@ -134,6 +155,8 @@ export function watchApplication(options: {
   }
 
   activeStreams.add(stop);
+  network?.addEventListener('offline', networkLost);
+  network?.addEventListener('online', networkRestored);
   connect();
   return stop;
 }
