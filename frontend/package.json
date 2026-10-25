@@ -16,7 +16,8 @@
     "api:check": "openapi-typescript ../docs/openapi.yaml -o src/api/schema.d.ts --check",
     "mock:api": "prism mock ../docs/openapi.yaml --host 127.0.0.1 --port 4010",
     "test": "node --test src/api/*.test.ts src/lib/*.test.ts",
-    "test:prism": "node scripts/check-prism.ts"
+    "test:prism": "node scripts/check-prism.ts",
+    "test:recovery": "node scripts/check-recovery.cjs"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
