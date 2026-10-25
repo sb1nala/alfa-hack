@@ -25,6 +25,7 @@ module.exports = async function checkDockerRecovery(browser, cfg) {
     await page.getByLabel(texts.login.loginLabel).fill(account.login);
     await page.getByLabel(texts.login.passwordLabel).fill(account.password);
     await page.getByRole('button', { name: texts.login.submit, exact: true }).click();
+    await page.waitForURL((url) => url.pathname === (account === analystAccount ? '/bank' : '/client'));
   }
   async function ready(context) {
     const end = Date.now() + 25_000;
