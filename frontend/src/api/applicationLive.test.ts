@@ -46,6 +46,28 @@ test('browser offline is visible even if native SSE remains OPEN; online restore
   assert.equal(reads.length, 2, 'Stop removes network listeners');
 });
 
+test('online replaces a source that became CLOSED while the browser was offline', async () => {
+  const network = new EventTarget();
+  const sources: FakeSource[] = [];
+  const reads: boolean[] = [];
+  const states: boolean[] = [];
+  const stop = watchApplication({ id: 'app', network,
+    createSource: () => { const source = new FakeSource(); sources.push(source); return source; },
+    refresh: async (_signal, history) => { reads.push(history); },
+    onConnection: (lost) => states.push(lost), onFatal: () => {},
+  });
+  try {
+    sources[0]!.open(); await tick();
+    network.dispatchEvent(new Event('offline')); sources[0]!.close();
+    network.dispatchEvent(new Event('online')); await tick();
+    assert.equal(sources.length, 2);
+    assert.equal(states.at(-1), true, 'Wait for a new open before clearing the warning');
+    sources[1]!.open(); await tick();
+    assert.deepEqual(reads, [true, true, true]);
+    assert.equal(states.at(-1), false);
+  } finally { stop(); }
+});
+
 test('open and all named events reread the snapshot; duplicate, foreign and invalid events are ignored', async () => {
   const source = new FakeSource();
   let reads = 0;

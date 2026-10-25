@@ -44,7 +44,7 @@ module.exports = async function checkDockerRecovery(browser, cfg) {
     return response.json();
   }
 
-  for (const fault of ['offline', 'backend-502', 'backend-recreate']) {
+  for (const fault of ['offline', 'offline-closed', 'backend-502', 'backend-recreate']) {
     const context = await browser.newContext();
     const analystContext = await browser.newContext();
     let backendDown = false;
@@ -126,18 +126,25 @@ module.exports = async function checkDockerRecovery(browser, cfg) {
         assert.equal(approved.status, 'APPROVED');
       }
 
-      if (fault === 'offline') {
+      if (fault === 'offline' || fault === 'offline-closed') {
         await context.setOffline(true);
         // Offline is applied by Chromium, not by replacing fetch or EventSource.
         await page.getByText(texts.errors.liveUpdatesLost, { exact: true }).waitFor();
         await page.getByRole('heading', { name: texts.statuses.MANUAL_REVIEW.title, exact: true }).waitFor();
+        if (fault === 'offline-closed') {
+          // Deterministic terminal transport fault: use the real browser close() API.
+          // HTTP 502 alone may leave Chromium in CONNECTING instead of CLOSED.
+          await page.evaluate(() => window.qaRecovery.sources.forEach((source) => source.close()));
+          await page.waitForFunction(() => window.qaRecovery.sources.every((source) => source.readyState === 2));
+        }
         await approve();
         await context.setOffline(false);
       } else {
         compose('stop', '-t', '1', 'backend');
         backendDown = true;
         await page.getByText(texts.errors.liveUpdatesLost, { exact: true }).waitFor();
-        await page.waitForFunction(() => window.qaRecovery.errors.includes(2));
+        await page.waitForFunction(() => window.qaRecovery.errors.length > 0);
+        if (!failed502) await page.waitForResponse((r) => new URL(r.url()).pathname.startsWith('/api/') && r.status() === 502);
         assert(failed502 > 0, 'Real nginx returned 502 during backend outage');
         await page.getByRole('heading', { name: texts.statuses.MANUAL_REVIEW.title, exact: true }).waitFor();
         await page.getByRole('button', { name: texts.applications.cancel, exact: true }).click();
@@ -176,6 +183,7 @@ module.exports = async function checkDockerRecovery(browser, cfg) {
         maximum: window.qaRecovery.maximum, frames: window.qaRecovery.frames.length,
       }));
       assert.equal(transport.maximum, 1, 'React never creates parallel EventSource objects');
+      if (fault === 'offline-closed') assert(transport.sources > 1, 'Real CLOSED source was replaced after Online');
       assert.deepEqual(pageErrors, [], 'No uncaught React errors');
       await page.getByRole('button', { name: texts.common.logout, exact: true }).click();
       await page.getByRole('button', { name: texts.login.submit, exact: true }).waitFor();
@@ -199,5 +207,5 @@ module.exports = async function checkDockerRecovery(browser, cfg) {
       '| Fault | Result | Document loads | History reads | Observed 502 |\n|---|---|---:|---:|---:|\n' +
       results.map((r) => `| ${r.fault} | PASS | ${r.documents} | ${r.historyReads} | ${r.failed502} |`).join('\n') + '\n');
   }
-  console.log('PASS actual React Docker recovery 3/3: persisted analyst decisions, native transport, no reload, logout cleanup');
+  console.log('PASS actual React Docker recovery 4/4: persisted analyst decisions, native transport, no reload, logout cleanup');
 };
