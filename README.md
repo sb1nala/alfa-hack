@@ -320,9 +320,10 @@ docker compose start db                      # readiness восстанавли�
 | Диаграмма состояний заявки | [`docs/application-states.md`](docs/application-states.md) | ✅ |
 | Модель данных | [`docs/data-model.md`](docs/data-model.md) | ✅ |
 | Тестовые сценарии | [`docs/test-scenarios.md`](docs/test-scenarios.md) | ✅ |
+| Продуктовый обзор: возможности, скриншоты, исследование → решения | [`docs/product/overview.md`](docs/product/overview.md) | ✅ |
 | Live-статус по SSE в кабинете | backend [PR #69](https://github.com/sb1nala/alfa-hack/pull/69), кабинет [PR #85](https://github.com/sb1nala/alfa-hack/pull/85) | ✅ |
 | Ресурсы и целевые показатели скорости | [раздел выше](#ресурсы-и-скорость) | ✅ |
 | ML-модель challenger для аналитика | [#35](https://github.com/sb1nala/alfa-hack/issues/35), [развитие](docs/architecture.md#ии-и-ml-развитие) | Не входит в MVP: решение на правилах, ML по условиям кейса не обязателен |
-| Прогон «как жюри» на чистой машине | [журнал](docs/test-scenarios.md#прогон-как-жюри) | ✅ 22.10: «Быстрый старт» проходит, все исходы 10/10; правки UI по прогону — [#87](https://github.com/sb1nala/alfa-hack/pull/87), [#93](https://github.com/sb1nala/alfa-hack/pull/93) |
+| Прогон «как жюри» на чистой машине | [журнал](docs/test-scenarios.md#прогон-как-жюри) | ✅ 25.10, финальный: чистый клон, сборка без кеша, «Быстрый старт» дословно, `run_e2e.py` 10/10, браузерные сценарии клиента и аналитика, отказ БД и перезапуск без потери данных |
 
 Если репозиторий приватный, доступ нужно выдать аккаунту жюри `alfa-hack-2026`.
